@@ -63,7 +63,9 @@ Each platform is its own artifact (no merged metadata module):
 
 Coordinates: `cn.enaium.treesitter:treesitter-languages-<lang>-kmp-<platform>:<version>`, with `-jvm`, `-android`,
 `-linuxx64`, `-linuxarm64`, `-mingwx64`, `-macosx64`, `-macosarm64`, `-iosarm64`, `-iossimulatorarm64` suffixes.
-Version is `project.version` in `gradle.properties` (`0.25.1`).
+Each language module is versioned by its grammar repository tag (e.g. `treesitter-languages-java-kmp-jvm:0.23.5`,
+`treesitter-languages-bash-kmp-jvm:0.25.1`, `treesitter-languages-agda-kmp-jvm:1.3.3`), read from the pinned
+submodule tag at build time.
 
 ## Usage
 

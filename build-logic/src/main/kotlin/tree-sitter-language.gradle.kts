@@ -52,6 +52,17 @@ val cSymbol: String = "tree_sitter_" + grammarName.replace("-", "_")
 
 val grammarDir: File = projectDir.resolve("tree-sitter-$grammarName")
 val libsDir: File = layout.buildDirectory.dir("libs").get().asFile
+
+// Version each module by its grammar repository tag (e.g. tree-sitter-java
+// v0.23.5 -> 0.23.5) so published artifacts track the grammar version.
+val grammarVersion: String = run {
+    val process = ProcessBuilder(
+        "git", "-C", grammarDir.path, "describe", "--tags", "--abbrev=0"
+    )
+    val tag = process.start().inputStream.bufferedReader().readText().trim()
+    tag.removePrefix("v")
+}
+version = grammarVersion
 val jniLibName: String = "ktreesitter-$grammarName"
 
 // Grammar source directories inside the submodule, per language.
@@ -475,14 +486,30 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile>().configureEa
 // cn.enaium.treesitter:treesitter-languages-<lang>-kmp-<platform>
 mavenPublishing {
     coordinates("cn.enaium.treesitter", "treesitter-languages-${grammarName}-kmp", project.version.toString())
+    publishToMavenCentral(automaticRelease = true)
+    signAllPublications()
+
     pom {
         name = "$className"
         description = "$grammarName grammar for tree-sitter"
+        url = "https://github.com/Enaium/tree-sitter-languages-kmp"
         licenses {
             license {
                 name = "MIT License"
                 url = "https://spdx.org/licenses/MIT.html"
             }
+        }
+        developers {
+            developer {
+                id = "enaium"
+                name = "Enaium"
+                url = "https://github.com/Enaium"
+            }
+        }
+        scm {
+            url = "https://github.com/Enaium/tree-sitter-languages-kmp"
+            connection = "scm:git:git@github.com:Enaium/tree-sitter-languages-kmp.git"
+            developerConnection = "scm:git:git@github.com:Enaium/tree-sitter-languages-kmp.git"
         }
     }
 }

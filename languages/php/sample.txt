@@ -1,0 +1,10 @@
+<?php
+
+function greet(string $name): string {
+    return "Hello, $name!";
+}
+
+$names = ['world', 'php'];
+foreach ($names as $name) {
+    echo greet($name) . "\n";
+}

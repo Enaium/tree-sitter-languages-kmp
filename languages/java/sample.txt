@@ -1,0 +1,26 @@
+package com.example;
+
+import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
+
+public class HelloWorld {
+    private final String name;
+
+    public HelloWorld(String name) {
+        this.name = name;
+    }
+
+    public static void main(String[] args) {
+        Map<String, List<Integer>> map = new HashMap<>();
+        map.put("answer", List.of(40, 2));
+        for (var entry : map.entrySet()) {
+            System.out.println(entry.getKey() + " = " + entry.getValue());
+        }
+    }
+
+    @Override
+    public String toString() {
+        return "HelloWorld{" + name + '}';
+    }
+}

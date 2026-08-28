@@ -1,0 +1,6 @@
+module Main where
+
+open import Data.Nat
+
+main : Nat
+main = suc (suc zero)

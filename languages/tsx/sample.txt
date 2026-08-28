@@ -1,0 +1,10 @@
+import React, { useState } from 'react';
+
+interface CounterProps {
+  initial: number;
+}
+
+export const Counter: React.FC<CounterProps> = ({ initial }) => {
+  const [count, setCount] = useState(initial);
+  return <button onClick={() => setCount(count + 1)}>{count}</button>;
+};

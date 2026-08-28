@@ -1,0 +1,72 @@
+[submodule "languages/tree-sitter-java"]
+	path = languages/java/tree-sitter-java
+	url = git@github.com:tree-sitter/tree-sitter-java.git
+[submodule "languages/agda/tree-sitter-agda"]
+	path = languages/agda/tree-sitter-agda
+	url = https://github.com/tree-sitter/tree-sitter-agda.git
+[submodule "languages/bash/tree-sitter-bash"]
+	path = languages/bash/tree-sitter-bash
+	url = https://github.com/tree-sitter/tree-sitter-bash.git
+[submodule "languages/c/tree-sitter-c"]
+	path = languages/c/tree-sitter-c
+	url = https://github.com/tree-sitter/tree-sitter-c.git
+[submodule "languages/c-sharp/tree-sitter-c-sharp"]
+	path = languages/c-sharp/tree-sitter-c-sharp
+	url = https://github.com/tree-sitter/tree-sitter-c-sharp.git
+[submodule "languages/cpp/tree-sitter-cpp"]
+	path = languages/cpp/tree-sitter-cpp
+	url = https://github.com/tree-sitter/tree-sitter-cpp.git
+[submodule "languages/css/tree-sitter-css"]
+	path = languages/css/tree-sitter-css
+	url = https://github.com/tree-sitter/tree-sitter-css.git
+[submodule "languages/embedded-template/tree-sitter-embedded-template"]
+	path = languages/embedded-template/tree-sitter-embedded-template
+	url = https://github.com/tree-sitter/tree-sitter-embedded-template.git
+[submodule "languages/go/tree-sitter-go"]
+	path = languages/go/tree-sitter-go
+	url = https://github.com/tree-sitter/tree-sitter-go.git
+[submodule "languages/haskell/tree-sitter-haskell"]
+	path = languages/haskell/tree-sitter-haskell
+	url = https://github.com/tree-sitter/tree-sitter-haskell.git
+[submodule "languages/html/tree-sitter-html"]
+	path = languages/html/tree-sitter-html
+	url = https://github.com/tree-sitter/tree-sitter-html.git
+[submodule "languages/javascript/tree-sitter-javascript"]
+	path = languages/javascript/tree-sitter-javascript
+	url = https://github.com/tree-sitter/tree-sitter-javascript.git
+[submodule "languages/json/tree-sitter-json"]
+	path = languages/json/tree-sitter-json
+	url = https://github.com/tree-sitter/tree-sitter-json.git
+[submodule "languages/julia/tree-sitter-julia"]
+	path = languages/julia/tree-sitter-julia
+	url = https://github.com/tree-sitter/tree-sitter-julia.git
+[submodule "languages/ocaml/tree-sitter-ocaml"]
+	path = languages/ocaml/tree-sitter-ocaml
+	url = https://github.com/tree-sitter/tree-sitter-ocaml.git
+[submodule "languages/php/tree-sitter-php"]
+	path = languages/php/tree-sitter-php
+	url = https://github.com/tree-sitter/tree-sitter-php.git
+[submodule "languages/python/tree-sitter-python"]
+	path = languages/python/tree-sitter-python
+	url = https://github.com/tree-sitter/tree-sitter-python.git
+[submodule "languages/regex/tree-sitter-regex"]
+	path = languages/regex/tree-sitter-regex
+	url = https://github.com/tree-sitter/tree-sitter-regex.git
+[submodule "languages/ruby/tree-sitter-ruby"]
+	path = languages/ruby/tree-sitter-ruby
+	url = https://github.com/tree-sitter/tree-sitter-ruby.git
+[submodule "languages/rust/tree-sitter-rust"]
+	path = languages/rust/tree-sitter-rust
+	url = https://github.com/tree-sitter/tree-sitter-rust.git
+[submodule "languages/scala/tree-sitter-scala"]
+	path = languages/scala/tree-sitter-scala
+	url = https://github.com/tree-sitter/tree-sitter-scala.git
+[submodule "languages/typescript/tree-sitter-typescript"]
+	path = languages/typescript/tree-sitter-typescript
+	url = https://github.com/tree-sitter/tree-sitter-typescript.git
+[submodule "languages/verilog/tree-sitter-verilog"]
+	path = languages/verilog/tree-sitter-verilog
+	url = https://github.com/tree-sitter/tree-sitter-verilog.git
+[submodule "languages/tsx/tree-sitter-tsx"]
+	path = languages/tsx/tree-sitter-tsx
+	url = https://github.com/tree-sitter/tree-sitter-typescript.git

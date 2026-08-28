@@ -1,0 +1,11 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title><%= title %></title>
+</head>
+<body>
+  <% if (user) { %>
+    <p>Hello, <%= user.name %></p>
+  <% } %>
+</body>
+</html>

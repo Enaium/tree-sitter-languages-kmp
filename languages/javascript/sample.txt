@@ -1,0 +1,8 @@
+function greet(name) {
+  return `Hello, ${name}!`;
+}
+
+const names = ['world', 'kotlin'];
+for (const n of names) {
+  console.log(greet(n));
+}

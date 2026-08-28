@@ -1,0 +1,10 @@
+interface Greeting {
+  name: string;
+}
+
+function greet(g: Greeting): string {
+  return `Hello, ${g.name}!`;
+}
+
+const items: Greeting[] = [{ name: 'world' }];
+console.log(items.map(greet));

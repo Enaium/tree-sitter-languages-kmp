@@ -1,0 +1,11 @@
+fn fib(n: u64) -> u64 {
+    match n {
+        0 | 1 => n,
+        _ => fib(n - 1) + fib(n - 2),
+    }
+}
+
+fn main() {
+    let v: Vec<u64> = (1..=10).map(fib).collect();
+    println!("{:?}", v);
+}

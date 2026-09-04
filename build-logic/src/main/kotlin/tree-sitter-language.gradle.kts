@@ -55,12 +55,17 @@ val libsDir: File = layout.buildDirectory.dir("libs").get().asFile
 
 // Version each module by its grammar repository tag (e.g. tree-sitter-java
 // v0.23.5 -> 0.23.5) so published artifacts track the grammar version.
-val grammarVersion: String = run {
-    val process = ProcessBuilder(
-        "git", "-C", grammarDir.path, "describe", "--tags", "--abbrev=0"
-    )
-    val tag = process.start().inputStream.bufferedReader().readText().trim()
-    tag.removePrefix("v")
+val grammarVersion: String = if (grammarName == "smali") {
+    // tree-sitter-smali tags releases as "stable" (no v1.0.0 tag exists).
+    "1.0.0"
+} else {
+    run {
+        val process = ProcessBuilder(
+            "git", "-C", grammarDir.path, "describe", "--tags", "--abbrev=0"
+        )
+        val tag = process.start().inputStream.bufferedReader().readText().trim()
+        tag.removePrefix("v")
+    }
 }
 version = grammarVersion
 val jniLibName: String = "ktreesitter-$grammarName"

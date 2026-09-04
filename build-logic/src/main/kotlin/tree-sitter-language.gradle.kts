@@ -71,7 +71,18 @@ val grammarSrcDirs: List<String> = when (grammarName) {
     "typescript" -> listOf("typescript/src")
     "tsx" -> listOf("tsx/src")
     "ocaml" -> listOf("grammars/ocaml/src")
+    "xml" -> listOf("xml/src")
+    "markdown" -> listOf("tree-sitter-markdown/src")
     else -> listOf("src")
+}
+
+// Extra C header include directories (some grammars keep headers under a
+// bindings/c/tree_sitter subdirectory instead of bindings/c).
+val grammarHeaderDirs: List<String> = when (grammarName) {
+    "lua", "yaml", "diff" -> listOf("bindings/c/tree_sitter")
+    "markdown" -> listOf("tree-sitter-markdown/bindings/c/tree_sitter")
+    "smali" -> listOf("bindings/swift")
+    else -> emptyList()
 }
 
 val grammarFiles: List<File> = grammarSrcDirs.flatMap { dir ->
@@ -155,7 +166,7 @@ val patchCmakeForHeader = tasks.register("patchCmakeForHeader") {
                 }
             }
             val genDirPath = layout.buildDirectory.dir("generatedGrammar").get().asFile.toPath()
-            val extraDirs = grammarSrcDirs + listOf("common")
+            val extraDirs = grammarSrcDirs + listOf("common") + grammarHeaderDirs
             extraDirs.map { grammarDir.resolve(it) }.filter { it.isDirectory }.forEach { dir ->
                 val rel = genDirPath.relativize(dir.toPath()).toString()
                 text += "\ninclude_directories($rel)\n"
@@ -194,6 +205,9 @@ fun KotlinNativeTarget.treesitter() {
         cinterops.create("treesitter") {
             definitionFile.set(generateTask.interopFile)
             includeDirs.allHeaders(grammarDir.resolve("bindings/c"))
+            grammarHeaderDirs.forEach { d ->
+                includeDirs.allHeaders(grammarDir.resolve(d))
+            }
             includeDirs.allHeaders(generatedHeaderDir)
             extraOpts("-libraryPath", File(libsDir, konanTarget.name).path)
             tasks.getByName(interopProcessingTaskName).mustRunAfter(generateTask)
@@ -434,6 +448,9 @@ val buildAndroidJni = tasks.register("buildAndroidJni") {
                     "-I" + grammarDir.resolve("bindings/c").path,
                     "-I" + generatedHeaderDir.path
                 )
+                grammarHeaderDirs.forEach { d ->
+                    args.add("-I" + grammarDir.resolve(d).path)
+                }
                 grammarSrcDirs.forEach { dir ->
                     args.add("-I" + grammarDir.resolve(dir).path)
                 }
@@ -449,6 +466,7 @@ val buildAndroidJni = tasks.register("buildAndroidJni") {
                     "-DTREE_SITTER_HIDE_SYMBOLS",
                     "-I" + grammarDir.resolve("bindings/c").path,
                     "-I" + generatedHeaderDir.path,
+                ) + grammarHeaderDirs.map { "-I" + grammarDir.resolve(it).path } + listOf(
                     File(layout.buildDirectory.dir("generatedGrammar").get().asFile, "src/jni/binding.c").path,
                     "-o", binding.path
                 )

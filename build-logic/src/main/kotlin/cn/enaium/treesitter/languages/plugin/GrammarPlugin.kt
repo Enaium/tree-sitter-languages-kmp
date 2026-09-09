@@ -38,7 +38,9 @@ class GrammarPlugin : Plugin<Project> {
             generatedSrc.set(project.layout.buildDirectory.dir("generatedGrammar/src"))
             cmakeListsFile.set(project.layout.buildDirectory.file("generatedGrammar/CMakeLists.txt"))
             interopFile.set(
-                project.layout.buildDirectory.file("generatedGrammar/src/nativeInterop/$interopName.def")
+                project.layout.buildDirectory.file(
+                    interopName.map { "generatedGrammar/src/nativeInterop/$it.def" }
+                )
             )
 
             outputs.dir(generatedSrc)

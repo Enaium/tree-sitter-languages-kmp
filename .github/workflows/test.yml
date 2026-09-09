@@ -58,6 +58,23 @@ jobs:
       - name: Install cross toolchain (linux-aarch64)
         if: matrix.cross == 'linux'
         run: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+      # The Windows runner needs the key decoded with PowerShell: bash is not
+      # the default shell there and GitHub's $RUNNER_TEMP is a Windows path.
+      - name: Decode signing key
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          [IO.File]::WriteAllBytes(
+            "$env:RUNNER_TEMP\signing-key.gpg",
+            [Convert]::FromBase64String("${{ secrets.SIGNING_KEY }}")
+          )
+          Get-Item "$env:RUNNER_TEMP\signing-key.gpg" | Select-Object Length
+
+      - name: Decode signing key
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          echo "${{ secrets.SIGNING_KEY }}" | tr -d ' \n' | base64 -d > "$RUNNER_TEMP/signing-key.gpg"
       - name: Build JNI libraries and publish to Maven Local
         run: |
           cross_args=""
@@ -66,12 +83,13 @@ jobs:
           elif [[ "${{ matrix.cross }}" == "macos" ]]; then
             cross_args="-Pjni.os=macos -Pjni.arch=x64"
           fi
+          signing_args="-Psigning.keyId=${{ secrets.SIGNING_KEY_ID }} -Psigning.secretKeyRingFile=$RUNNER_TEMP/signing-key.gpg -Psigning.password=${{ secrets.SIGNING_PASSWORD }}"
           tasks=""
           for lang in languages/*/; do
             tasks="$tasks :languages:$(basename "$lang"):buildJni"
           done
-          ./gradlew --no-daemon $cross_args $tasks
-          ./gradlew --no-daemon \
+          ./gradlew --no-daemon $signing_args $cross_args $tasks
+          ./gradlew --no-daemon $signing_args \
             :languages:java:publishJvmPublicationToMavenLocal \
             :languages:xml:publishJvmPublicationToMavenLocal \
             :jni:${{ matrix.jni-suffix }}:jniJar \

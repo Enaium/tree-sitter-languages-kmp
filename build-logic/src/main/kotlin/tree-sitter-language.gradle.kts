@@ -55,17 +55,29 @@ val libsDir: File = layout.buildDirectory.dir("libs").get().asFile
 
 // Version each module by its grammar repository tag (e.g. tree-sitter-java
 // v0.23.5 -> 0.23.5) so published artifacts track the grammar version.
+// CI checks submodules out without tags, so fall back to fetching them
+// (the checkout URL rewrite applies to submodule remotes too).
+fun resolveGrammarVersion(): String {
+    fun run(vararg args: String): Pair<Int, String> {
+        val process = ProcessBuilder(*args).directory(grammarDir).start()
+        val out = process.inputStream.bufferedReader().readText().trim()
+        return process.waitFor() to out
+    }
+    val (code, tag) = run("git", "describe", "--tags", "--abbrev=0")
+    if (code == 0 && tag.isNotEmpty()) return tag.removePrefix("v")
+    run("git", "fetch", "--tags", "--quiet", "origin")
+    val (code2, tag2) = run("git", "describe", "--tags", "--abbrev=0")
+    check(code2 == 0 && tag2.isNotEmpty()) {
+        "Cannot determine version for grammar $grammarName (git describe failed)"
+    }
+    return tag2.removePrefix("v")
+}
+
 val grammarVersion: String = if (grammarName == "smali") {
     // tree-sitter-smali tags releases as "stable" (no v1.0.0 tag exists).
     "1.0.0"
 } else {
-    run {
-        val process = ProcessBuilder(
-            "git", "-C", grammarDir.path, "describe", "--tags", "--abbrev=0"
-        )
-        val tag = process.start().inputStream.bufferedReader().readText().trim()
-        tag.removePrefix("v")
-    }
+    resolveGrammarVersion()
 }
 version = grammarVersion
 val jniLibName: String = "ktreesitter-$grammarName"
@@ -176,8 +188,9 @@ val patchCmakeForHeader = tasks.register("patchCmakeForHeader") {
                 val rel = genDirPath.relativize(dir.toPath()).toString()
                 text += "\ninclude_directories($rel)\n"
             }
-            if (!text.contains(generatedHeaderDir.path)) {
-                text += "\ninclude_directories(${generatedHeaderDir.path})\n"
+            val generatedHeaderPath = generatedHeaderDir.path.replace("\\", "/")
+            if (!text.contains(generatedHeaderPath)) {
+                text += "\ninclude_directories($generatedHeaderPath)\n"
             }
             cmakeFile.writeText(text)
         }

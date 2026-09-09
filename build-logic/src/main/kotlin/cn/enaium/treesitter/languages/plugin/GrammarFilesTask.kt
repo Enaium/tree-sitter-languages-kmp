@@ -179,7 +179,8 @@ abstract class GrammarFilesTask : DefaultTask() {
     }
 
     private fun relative(file: Path): String =
-        generatedSrc.get().asFile.toPath().parent.relativize(file).toString()
+        generatedSrc.get().asFile.toPath().parent.relativize(file)
+            .toString().replace("\\", "/")
 
     private fun srcFiles(): String {
         val grammarSrcDir = grammarDir.get().toPath().resolve("src")

@@ -65,7 +65,9 @@ fun resolveGrammarVersion(): String {
     }
     val (code, tag) = run("git", "describe", "--tags", "--abbrev=0")
     if (code == 0 && tag.isNotEmpty()) return tag.removePrefix("v")
-    run("git", "fetch", "--tags", "--quiet", "origin")
+    // actions/checkout checks submodules out shallow without tags; unshallow
+    // (no-op on full clones) so the describe succeeds.
+    run("git", "fetch", "--unshallow", "--tags", "--quiet", "origin")
     val (code2, tag2) = run("git", "describe", "--tags", "--abbrev=0")
     check(code2 == 0 && tag2.isNotEmpty()) {
         "Cannot determine version for grammar $grammarName (git describe failed)"
@@ -174,7 +176,7 @@ val patchCmakeForHeader = tasks.register("patchCmakeForHeader") {
                 .firstOrNull { it.isFile }
             if (scannerFile != null && !text.contains("scanner")) {
                 val genDir = layout.buildDirectory.dir("generatedGrammar").get().asFile
-                val rel = genDir.toPath().relativize(scannerFile.toPath()).toString()
+                val rel = genDir.toPath().relativize(scannerFile.toPath()).toString().replace("\\", "/")
                 val addLib = "add_library("
                 val idx = text.indexOf(addLib)
                 if (idx >= 0) {
@@ -185,7 +187,7 @@ val patchCmakeForHeader = tasks.register("patchCmakeForHeader") {
             val genDirPath = layout.buildDirectory.dir("generatedGrammar").get().asFile.toPath()
             val extraDirs = grammarSrcDirs + listOf("common") + grammarHeaderDirs
             extraDirs.map { grammarDir.resolve(it) }.filter { it.isDirectory }.forEach { dir ->
-                val rel = genDirPath.relativize(dir.toPath()).toString()
+                val rel = genDirPath.relativize(dir.toPath()).toString().replace("\\", "/")
                 text += "\ninclude_directories($rel)\n"
             }
             val generatedHeaderPath = generatedHeaderDir.path.replace("\\", "/")

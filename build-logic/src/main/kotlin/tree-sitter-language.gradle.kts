@@ -222,7 +222,23 @@ fun KotlinNativeTarget.treesitter() {
 }
 
 kotlin {
-    jvm()
+    jvm() {
+        // The JVM artifact is pure Java; the per-platform JNI artifacts are
+        // runtime dependencies so consumers get the native library for their
+        // OS/arch (published from CI on each platform).
+        val jniArtifacts = listOf(
+            "treesitter-languages-jni-darwin-aarch64",
+            "treesitter-languages-jni-darwin-x86_64",
+            "treesitter-languages-jni-linux-x86_64",
+            "treesitter-languages-jni-linux-aarch64",
+            "treesitter-languages-jni-windows-x86_64"
+        )
+        sourceSets["jvmMain"].dependencies {
+            jniArtifacts.forEach { artifact ->
+                runtimeOnly("cn.enaium.treesitter:$artifact:0.25.1")
+            }
+        }
+    }
 
     androidLibrary {
         namespace = packageName
@@ -262,9 +278,6 @@ kotlin {
             }
         }
 
-        getByName("jvmMain") {
-            resources.srcDir(layout.buildDirectory.dir("jni-libs"))
-        }
 
         getByName("jvmTest") {
             dependencies {
@@ -305,14 +318,10 @@ tasks.matching { it.name == "androidSourcesJar" || it.name.endsWith("SourcesJar"
 }
 
 
+// The JVM artifact is pure Java; JNI libraries ship in separate
+// -kmp-jni-<os>-<arch> artifacts (published per-platform from CI).
 tasks.named("jvmProcessResources") {
-    dependsOn(generateTask, buildJni)
-}
-
-// The KMP jvmJar packages jvmMain resources directly; ensure the JNI library
-// is installed before the jar is assembled.
-tasks.named("jvmJar") {
-    dependsOn(buildJni)
+    dependsOn(generateTask)
 }
 
 // ===== Native grammar compilation =====
@@ -387,25 +396,52 @@ val hostArch: String = when (System.getProperty("os.arch")) {
     else -> "x64"
 }
 
+// CI can cross-compile a platform different from the host (e.g. linux-aarch64
+// on an x64 runner) by overriding these properties.
+val jniOs: String = (findProperty("jni.os") as String?) ?: hostOs
+val jniArch: String = (findProperty("jni.arch") as String?) ?: hostArch
+
 val jniLibsDir = layout.buildDirectory.dir("jni-libs")
 
 val buildJni = tasks.register("buildJni") {
     group = "build"
-    description = "Build the JNI library for the host platform ($hostOs/$hostArch)"
+    description = "Build the JNI library for platform $jniOs/$jniArch"
     dependsOn(generateTask)
     outputs.dir(jniLibsDir)
     doLast {
         val generatedDir = layout.buildDirectory.dir("generatedGrammar").get().asFile
         val buildDir = layout.buildDirectory.dir(".cmake/jni").get().asFile
         val installPrefix = jniLibsDir.get().asFile
-        val installLibDir = "lib/$hostOs/$hostArch"
+        val installLibDir = "lib/$jniOs/$jniArch"
+        val crossArgs = mutableListOf<String>()
+        if (jniOs != hostOs || jniArch != hostArch) {
+            // Cross-compile toolchain (used by CI for linux-aarch64, darwin-x86_64).
+            if (jniOs == "macos") {
+                crossArgs += "-DCMAKE_OSX_ARCHITECTURES=" +
+                    if (jniArch == "aarch64") "arm64" else "x86_64"
+            } else if (jniOs == "linux") {
+                crossArgs += "-DCMAKE_SYSTEM_NAME=Linux"
+                crossArgs += "-DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc"
+                crossArgs += "-DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++"
+                // FindJNI does not work when cross-compiling; point it at the
+                // host JDK headers (arch-independent jni.h/jni_md.h).
+                val javaHome = System.getenv("JAVA_HOME")
+                if (javaHome != null) {
+                    crossArgs += "-DJNI_INCLUDE_DIRS=${File(javaHome, "include").path}"
+                }
+            }
+        }
+        // Allow arbitrary extra CMake args (-Pjni.cmakeArgs=...).
+        (findProperty("jni.cmakeArgs") as String?)?.split(" ")?.filter { it.isNotBlank() }?.let {
+            crossArgs += it
+        }
         runProcess(
             listOf(
                 "cmake", "-S", generatedDir.path, "-B", buildDir.path,
                 "-DCMAKE_BUILD_TYPE=RelWithDebInfo",
                 "-DCMAKE_INSTALL_PREFIX=${installPrefix.path}",
                 "-DCMAKE_INSTALL_LIBDIR=$installLibDir"
-            )
+            ) + crossArgs
         )
         runProcess(listOf("cmake", "--build", buildDir.path))
         runProcess(listOf("cmake", "--install", buildDir.path))

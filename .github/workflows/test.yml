@@ -1,0 +1,123 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  # Each job builds the JVM JNI library for one platform, publishes the
+  # language (JVM) and platform JNI artifacts to Maven Local, then consumes
+  # them from a fresh Gradle project. Native jobs run the smoke project;
+  # cross-compiled jobs can only verify the packaged artifact contents.
+  jvm:
+    name: jvm (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x64
+            os: ubuntu-24.04
+            jni-suffix: linux-x86_64
+            cross: ""
+            smoke: true
+          - name: linux-arm64
+            os: ubuntu-24.04
+            jni-suffix: linux-aarch64
+            cross: linux
+            smoke: false
+          - name: windows-x64
+            os: windows-2022
+            jni-suffix: windows-x86_64
+            cross: ""
+            smoke: true
+          - name: macos-arm64
+            os: macos-14
+            jni-suffix: darwin-aarch64
+            cross: ""
+            smoke: true
+          - name: macos-x64
+            os: macos-14
+            jni-suffix: darwin-x86_64
+            cross: macos
+            smoke: false
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      # Submodules are pinned with SSH URLs; rewrite to HTTPS for CI.
+      - name: Rewrite submodule URLs for CI
+        run: git config --global url."https://github.com/".insteadOf "git@github.com:"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+      - name: Install cross toolchain (linux-aarch64)
+        if: matrix.cross == 'linux'
+        run: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+      - name: Build JNI libraries and publish to Maven Local
+        run: |
+          cross_args=""
+          if [[ "${{ matrix.cross }}" == "linux" ]]; then
+            cross_args="-Pjni.os=linux -Pjni.arch=aarch64"
+          elif [[ "${{ matrix.cross }}" == "macos" ]]; then
+            cross_args="-Pjni.os=macos -Pjni.arch=x64"
+          fi
+          tasks=""
+          for lang in languages/*/; do
+            tasks="$tasks :languages:$(basename "$lang"):buildJni"
+          done
+          ./gradlew --no-daemon $cross_args $tasks
+          ./gradlew --no-daemon \
+            :languages:java:publishJvmPublicationToMavenLocal \
+            :languages:xml:publishJvmPublicationToMavenLocal \
+            :jni:${{ matrix.jni-suffix }}:jniJar \
+            :jni:${{ matrix.jni-suffix }}:publishToMavenLocal
+        shell: bash
+      - name: Verify JNI artifact contents
+        run: |
+          jar tf ~/.m2/repository/cn/enaium/treesitter/treesitter-languages-jni-${{ matrix.jni-suffix }}/0.25.1/*.jar | grep -E "lib/.*/libktreesitter-java" | head -3
+          jar tf ~/.m2/repository/cn/enaium/treesitter/treesitter-languages-jni-${{ matrix.jni-suffix }}/0.25.1/*.jar | wc -l
+        shell: bash
+      - name: Consume from Maven Local
+        if: matrix.smoke
+        run: |
+          mkdir -p smoke/src/main/kotlin
+          cat > smoke/settings.gradle.kts <<'EOF'
+          pluginManagement { repositories { mavenCentral(); gradlePluginPortal() } }
+          dependencyResolutionManagement {
+              repositories { mavenLocal(); mavenCentral() }
+          }
+          rootProject.name = "smoke"
+          EOF
+          cat > smoke/build.gradle.kts <<'EOF'
+          plugins { kotlin("jvm") version "2.3.20"; application }
+          dependencies {
+              implementation("io.github.tree-sitter:ktreesitter:0.25.1")
+              implementation("cn.enaium.treesitter:treesitter-languages-java-kmp-jvm:0.23.5")
+              implementation("cn.enaium.treesitter:treesitter-languages-xml-kmp-jvm:0.7.0")
+          }
+          application { mainClass.set("MainKt") }
+          kotlin { jvmToolchain(17) }
+          EOF
+          cat > smoke/src/main/kotlin/Main.kt <<'EOF'
+          import io.github.treesitter.ktreesitter.Language
+          import io.github.treesitter.ktreesitter.Parser
+          import cn.enaium.treesitter.languages.java.TreeSitterJava
+          import cn.enaium.treesitter.languages.xml.TreeSitterXml
+
+          fun main() {
+              val j = Parser(Language(TreeSitterJava.language())).parse("class A {}")!!.rootNode.type
+              println("java root: $j")
+              check(j == "program")
+              val x = Parser(Language(TreeSitterXml.language())).parse("<a/>")!!.rootNode.type
+              println("xml root: $x")
+              check(x == "document")
+              println("SMOKE OK")
+          }
+          EOF
+          ./gradlew -p smoke run --no-daemon
+        shell: bash

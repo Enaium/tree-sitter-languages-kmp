@@ -463,8 +463,8 @@ val buildJni = tasks.register("buildJni") {
                 "-DCMAKE_INSTALL_LIBDIR=$installLibDir"
             ) + crossArgs
         )
-        runProcess(listOf("cmake", "--build", buildDir.path))
-        runProcess(listOf("cmake", "--install", buildDir.path))
+        runProcess(listOf("cmake", "--build", buildDir.path, "--config", "RelWithDebInfo"))
+        runProcess(listOf("cmake", "--install", buildDir.path, "--config", "RelWithDebInfo"))
     }
 }
 

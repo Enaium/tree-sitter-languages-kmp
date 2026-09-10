@@ -115,8 +115,15 @@ jobs:
           plugins { kotlin("jvm") version "2.3.20"; application }
           dependencies {
               implementation("io.github.tree-sitter:ktreesitter:0.25.1")
-              implementation("cn.enaium.treesitter:treesitter-languages-java-kmp-jvm:0.23.5")
-              implementation("cn.enaium.treesitter:treesitter-languages-xml-kmp-jvm:0.7.0")
+              implementation("cn.enaium.treesitter:treesitter-languages-java-kmp-jvm:0.23.5") {
+                  exclude(group = "cn.enaium.treesitter")
+              }
+              implementation("cn.enaium.treesitter:treesitter-languages-xml-kmp-jvm:0.7.0") {
+                  exclude(group = "cn.enaium.treesitter")
+              }
+              // The -kmp-jvm POM lists all five JNI artifacts as runtimeOnly;
+              // only the current platform's was published to Maven Local.
+              implementation("cn.enaium.treesitter:treesitter-languages-jni-${{ matrix.jni-suffix }}:0.25.1")
           }
           application { mainClass.set("MainKt") }
           kotlin { jvmToolchain(17) }

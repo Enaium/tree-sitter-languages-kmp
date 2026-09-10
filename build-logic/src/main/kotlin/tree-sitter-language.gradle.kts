@@ -4,7 +4,6 @@ import java.io.File
 import java.time.Duration
 import java.io.OutputStream.nullOutputStream
 import org.gradle.internal.os.OperatingSystem
-import org.gradle.api.file.RelativePath
 import org.gradle.kotlin.dsl.support.useToRun
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
@@ -82,7 +81,10 @@ val grammarVersion: String = if (grammarName == "smali") {
 } else {
     resolveGrammarVersion()
 }
-version = grammarVersion
+// Release suffix: the grammar tag version was already published, so append
+// .1 (x.x.x.1) for this project's publications.
+val publishVersion: String = "$grammarVersion.1"
+version = publishVersion
 val jniLibName: String = "ktreesitter-$grammarName"
 
 // Grammar source directories inside the submodule, per language.
@@ -239,10 +241,19 @@ fun KotlinNativeTarget.treesitter() {
 
 kotlin {
     jvm() {
-        // The JVM artifact embeds the native library for the platform it was
-        // built on (see jvmProcessResources below), so consumers get the
-        // native binary from the jar itself.
-        sourceSets["jvmMain"]
+        // The JVM artifact is pure Java; the native library comes from the
+        // per-platform JNI artifacts published alongside it (see the
+        // publishing block below) — one artifact per language per platform,
+        // like sdl-kmp's jni-jvm-* modules.
+        val jniPlatformDeps = listOf(
+            "darwin-aarch64", "darwin-x86_64",
+            "linux-x86_64", "linux-aarch64", "windows-x86_64"
+        )
+        sourceSets["jvmMain"].dependencies {
+            jniPlatformDeps.forEach { suffix ->
+                runtimeOnly("cn.enaium.treesitter:treesitter-languages-$grammarName-kmp-jni-$suffix:$publishVersion")
+            }
+        }
     }
 
     androidLibrary {
@@ -323,23 +334,10 @@ tasks.matching { it.name == "androidSourcesJar" || it.name.endsWith("SourcesJar"
 }
 
 
-// The JVM artifact embeds the native library built by buildJni (for the
-// host platform, or the -Pjni.os/-Pjni.arch cross target on CI) at
-// /lib/<arch>-<os>-<name>.<ext> inside the jar, matching the loader in
-// jvm.kt.in (tree-sitter-ng layout).
-tasks.named<ProcessResources>("jvmProcessResources") {
-    dependsOn(generateTask, buildJni)
-    from(jniLibsDir) {
-        include("lib/$jniOs/$jniArch/*")
-        eachFile {
-            val ext = name.substringAfterLast('.')
-            val bare = name.removePrefix("lib").removeSuffix(".$ext")
-            name = "$jniArch-$jniOs-$bare.$ext"
-            path = "lib/$name"
-            relativePath = RelativePath(true, *"lib/$name".split('/').toTypedArray())
-        }
-        includeEmptyDirs = false
-    }
+// The JVM artifact is pure Java; the native libraries ship in the
+// per-language per-platform JNI artifacts (see publishing block below).
+tasks.named("jvmProcessResources") {
+    dependsOn(generateTask)
 }
 
 // ===== Native grammar compilation =====
@@ -564,10 +562,8 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile>().configureEa
 }
 
 // ===== Publishing (com.vanniktech.maven.publish) =====
-// Each platform is published as its own artifact:
-// cn.enaium.treesitter:treesitter-languages-<lang>-kmp-<platform>
 mavenPublishing {
-    coordinates("cn.enaium.treesitter", "treesitter-languages-${grammarName}-kmp", project.version.toString())
+    coordinates("cn.enaium.treesitter", "treesitter-languages-${grammarName}-kmp", publishVersion)
     publishToMavenCentral(automaticRelease = true)
     signAllPublications()
 

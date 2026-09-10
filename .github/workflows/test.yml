@@ -84,22 +84,23 @@ jobs:
           ./gradlew --no-daemon $signing_args $cross_args $tasks
           ./gradlew --no-daemon $signing_args $cross_args \
             :languages:java:publishJvmPublicationToMavenLocal \
-            :languages:xml:publishJvmPublicationToMavenLocal
+            :languages:xml:publishJvmPublicationToMavenLocal \
+            :jni:java-${{ matrix.jni-suffix }}:publishToMavenLocal \
+            :jni:xml-${{ matrix.jni-suffix }}:publishToMavenLocal
         shell: bash
-      - name: Verify JVM artifact embeds the native library
+      - name: Verify JNI artifact embeds the native library
         if: runner.os != 'Windows'
         run: |
-          # The jvm jar ships the native library built for this runner,
-          # named <arch>-<os>-<lang>.<ext> (tree-sitter-ng layout).
-          jar="$(find ~/.m2/repository/cn/enaium/treesitter/treesitter-languages-java-kmp-jvm -name '*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' | head -1)"
-          echo "jar=$jar"
-          jar tf "$jar" | grep -E "lib/" | head -5
-          jar tf "$jar" | grep -E "lib/.*-ktreesitter-(java|xml)\.(so|dylib|dll)" | head -3
+          # The jni jar ships the native library built for this runner
+          # at lib/<os>/<arch>/libktreesitter-<lang>.<ext>.
+          for lang in java xml; do
+            jar="$(find ~/.m2/repository/cn/enaium/treesitter/treesitter-languages-$lang-kmp-jni-${{ matrix.jni-suffix }} -name '*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' | head -1)"
+            echo "jar=$jar"
+            jar tf "$jar" | grep -E "lib/.*/libktreesitter-$lang" | head -2
+          done
         shell: bash
-      - name: Verify JVM artifact exists
+      - name: Verify JNI artifact exists
         if: runner.os == 'Windows'
         run: |
-          # The native library embedding is exercised by the publish build;
-          # listing jar contents from Git-bash is unreliable on Windows.
-          test -n "$(find ~/.m2/repository/cn/enaium/treesitter/treesitter-languages-java-kmp-jvm -name '*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' | head -1)"
+          test -n "$(find ~/.m2/repository/cn/enaium/treesitter/treesitter-languages-java-kmp-jni-${{ matrix.jni-suffix }} -name '*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' | head -1)"
         shell: bash

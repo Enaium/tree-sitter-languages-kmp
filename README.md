@@ -63,36 +63,30 @@ Every language module targets:
 
 ## Publishing
 
-Languages are published to Maven Local with [com.vanniktech.maven.publish](https://github.com/vanniktech/gradle-maven-publish-plugin) 0.37.0.
-Each platform is its own artifact (no merged metadata module):
+Languages are published to Maven Central with [com.vanniktech.maven.publish](https://github.com/vanniktech/gradle-maven-publish-plugin) 0.37.0.
+Each language publishes a JVM jar plus one JNI artifact per platform (sdl-kmp layout):
 
 ```bash
-./gradlew publishToMavenLocal                      # all modules, all platforms
-./gradlew :languages:java:publishToMavenLocal      # single language
+./gradlew :languages:java:publishToMavenLocal                # java jvm jar + jni artifacts to Maven Local
+./gradlew :jni:java-darwin-aarch64:publishToMavenLocal       # single platform jni artifact
 ```
 
-Coordinates: `cn.enaium.treesitter:treesitter-languages-<lang>-kmp-<platform>:<version>`, with `-jvm`, `-android`,
-`-linuxx64`, `-linuxarm64`, `-mingwx64`, `-macosx64`, `-macosarm64`, `-iosarm64`, `-iossimulatorarm64` suffixes.
-Each language module is versioned by its grammar repository tag (e.g. `treesitter-languages-java-kmp-jvm:0.23.5`,
-`treesitter-languages-bash-kmp-jvm:0.25.1`, `treesitter-languages-agda-kmp-jvm:1.3.3`), read from the pinned
-submodule tag at build time (smali is pinned to `1.0.0` because its repo tags releases as `stable`).
+Coordinates: `cn.enaium.treesitter:treesitter-languages-<lang>-kmp-jvm:<version>` for the pure-Java JVM jar and
+`cn.enaium.treesitter:treesitter-languages-<lang>-kmp-jni-<platform>:<version>` for the per-platform JNI jars
+(`darwin-aarch64`, `darwin-x86_64`, `linux-x86_64`, `linux-aarch64`, `windows-x86_64`), each embedding the native
+grammar library at `lib/<os>/<arch>/libktreesitter-<lang>.<ext>`.
 
-Local test: `./gradlew :languages:xml:publishToMavenLocal` then consume
-`cn.enaium.treesitter:treesitter-languages-xml-kmp-jvm:<tag-version>` from `mavenLocal()`.
+Each language module is versioned by its grammar repository tag plus a `.1` release suffix (e.g.
+tree-sitter-java v0.23.5 -> `treesitter-languages-java-kmp-jvm:0.23.5.1`, tree-sitter-xml v0.7.0 ->
+`treesitter-languages-xml-kmp-jvm:0.7.0.1`), read from the pinned submodule tag at build time (smali is pinned to
+`1.0.0.1` because its repo tags releases as `stable`).
 
-### JVM runtime artifacts
+The jvm POM lists all five JNI artifacts as `runtime` dependencies; the generated binding's `libPath()` picks the
+native library matching the consumer's OS/arch from whichever JNI jar the dependency resolution selected.
 
-The JVM jar embeds the platform native grammar library built by `buildJni` at
-`lib/<arch>-<os>-<lang>.<ext>` inside the jar (tree-sitter-ng layout), e.g.
-`lib/aarch64-macos-ktreesitter-java.dylib`. At runtime the generated binding's
-`libPath()` picks the entry matching the consumer's OS/arch and unpacks it to a
-temp file before `System.load`. Each CI platform builds and publishes the JVM
-jar for its own platform (`-Pjni.os` / `-Pjni.arch` override the host platform
-for cross-compiled `linux-aarch64` / `darwin-x86_64`).
-
-CI (`.github/workflows/test.yml`) builds each platform's JNI libraries,
-publishes the language JVM jars to Maven Local, and verifies the native library
-is embedded in each jar.
+CI (`.github/workflows/test.yml`) builds each platform's JNI libraries, publishes the java/xml jvm jars and the
+platform's JNI jars to Maven Local, and verifies the native library is embedded. `.github/workflows/publish.yml`
+publishes java/xml to Maven Central (manual trigger).
 
 ## Usage
 

@@ -5,10 +5,12 @@ plugins {
 
 allprojects {
     group = "cn.enaium.treesitter"
-    version = property("project.version") as String
+    // No root version: each language module sets its own from the grammar
+    // repository tag (build-logic tree-sitter-language.gradle.kts).
 
     repositories {
         mavenCentral()
         google()
     }
 }
+

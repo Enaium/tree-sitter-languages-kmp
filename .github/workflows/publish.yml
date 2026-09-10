@@ -1,0 +1,204 @@
+name: Publish
+
+"on":
+  workflow_dispatch:
+
+# Publishes the language JVM jars and per-platform JNI artifacts to Maven
+# Central. Each publication is produced by exactly one runner:
+#
+#   macos-14      -> java/xml -kmp-jvm jars + their -kmp-jni-darwin-* artifacts
+#                    (metadata, jvm and Android publications are only on macOS;
+#                    the -kmp-jvm jar is pure Java so it is identical here and
+#                    on Linux, but Maven Central forbids re-publishing the same
+#                    coordinates, so the jvm jars are published from macOS)
+#   ubuntu-latest -> java/xml -kmp-jvm jars + their -kmp-jni-linux-* artifacts
+#                    (cross-compiled linux-aarch64 via the aarch64-linux-gnu
+#                    toolchain)
+#   windows-latest -> java/xml -kmp-jni-windows-x86_64 artifacts (native
+#                    MinGW/CMake build)
+#
+# The jvm POM of each language lists all five JNI artifacts as runtime
+# dependencies, so all of them must be published before consumers can resolve
+# the language artifact.
+#
+# Trigger: run manually via the Actions tab. Versions are the grammar tags
+# of each language plus a .1 release suffix (e.g. tree-sitter-java v0.23.5
+# -> 0.23.5.1), resolved from the submodules at build time.
+#
+# Required repository secrets (Settings -> Secrets and variables -> Actions):
+#   MAVEN_CENTRAL_USERNAME   Sonatype Central Portal user-token username
+#   MAVEN_CENTRAL_PASSWORD   Sonatype Central Portal user-token password
+#   SIGNING_KEY              base64-encoded PGP secret key ring (.gpg, binary)
+#   SIGNING_KEY_ID           8-hex-digit key id (without the 0x prefix)
+#   SIGNING_PASSWORD         Passphrase of the signing key
+
+jobs:
+  publish-macos:
+    name: Publish macOS (jvm jars + darwin JNI artifacts)
+    runs-on: macos-14
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Rewrite submodule URLs for CI
+        run: git config --global url."https://github.com/".insteadOf "git@github.com:"
+
+      - name: Configure JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          validate-wrappers: false
+
+      - name: Decode signing key
+        run: |
+          echo "${{ secrets.SIGNING_KEY }}" | tr -d ' \n' | base64 -d > "$RUNNER_TEMP/signing-key.gpg"
+
+      - name: Build JNI libraries for all languages
+        run: |
+          tasks=""
+          for lang in languages/*/; do
+            tasks="$tasks :languages:$(basename "$lang"):buildJni"
+          done
+          ./gradlew --no-daemon $tasks
+
+      - name: Publish jvm jars and darwin JNI artifacts to Maven Central
+        env:
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+        run: >
+          ./gradlew --no-daemon --stacktrace
+          -Psigning.keyId="${{ secrets.SIGNING_KEY_ID }}"
+          -Psigning.secretKeyRingFile="${{ runner.temp }}/signing-key.gpg"
+          -Psigning.password="${{ secrets.SIGNING_PASSWORD }}"
+          -PmavenCentralUsername="${{ secrets.MAVEN_CENTRAL_USERNAME }}"
+          -PmavenCentralPassword="${{ secrets.MAVEN_CENTRAL_PASSWORD }}"
+          :languages:java:publishJvmPublicationToMavenCentral
+          :languages:xml:publishJvmPublicationToMavenCentral
+          :jni:java-darwin-aarch64:publishMavenPublicationToMavenCentralRepository
+          :jni:java-darwin-x86_64:publishMavenPublicationToMavenCentralRepository
+          :jni:xml-darwin-aarch64:publishMavenPublicationToMavenCentralRepository
+          :jni:xml-darwin-x86_64:publishMavenPublicationToMavenCentralRepository
+
+  publish-linux:
+    name: Publish Linux (jvm jars + linux JNI artifacts)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Rewrite submodule URLs for CI
+        run: git config --global url."https://github.com/".insteadOf "git@github.com:"
+
+      - name: Configure JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install cross toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          validate-wrappers: false
+
+      - name: Decode signing key
+        run: |
+          echo "${{ secrets.SIGNING_KEY }}" | tr -d ' \n' | base64 -d > "$RUNNER_TEMP/signing-key.gpg"
+
+      - name: Build JNI libraries for all languages
+        run: |
+          tasks=""
+          for lang in languages/*/; do
+            tasks="$tasks :languages:$(basename "$lang"):buildJni"
+          done
+          ./gradlew --no-daemon $tasks
+
+      - name: Cross-build linux-aarch64 JNI libraries
+        run: |
+          tasks=""
+          for lang in languages/*/; do
+            tasks="$tasks :languages:$(basename "$lang"):buildJni"
+          done
+          ./gradlew --no-daemon -Pjni.os=linux -Pjni.arch=aarch64 $tasks
+
+      - name: Publish jvm jars and linux JNI artifacts to Maven Central
+        run: >
+          ./gradlew --no-daemon --stacktrace
+          -Psigning.keyId="${{ secrets.SIGNING_KEY_ID }}"
+          -Psigning.secretKeyRingFile="${{ runner.temp }}/signing-key.gpg"
+          -Psigning.password="${{ secrets.SIGNING_PASSWORD }}"
+          :languages:java:publishJvmPublicationToMavenCentral
+          :languages:xml:publishJvmPublicationToMavenCentral
+          :jni:java-linux-x86_64:publishMavenPublicationToMavenCentralRepository
+          :jni:java-linux-aarch64:publishMavenPublicationToMavenCentralRepository
+          :jni:xml-linux-x86_64:publishMavenPublicationToMavenCentralRepository
+          :jni:xml-linux-aarch64:publishMavenPublicationToMavenCentralRepository
+        env:
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+
+  publish-windows:
+    name: Publish Windows (windows JNI artifacts)
+    runs-on: windows-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Rewrite submodule URLs for CI
+        run: git config --global url."https://github.com/".insteadOf "git@github.com:"
+
+      - name: Configure JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          validate-wrappers: false
+
+      - name: Decode signing key
+        shell: pwsh
+        run: |
+          [IO.File]::WriteAllBytes(
+            "$env:RUNNER_TEMP\signing-key.gpg",
+            [Convert]::FromBase64String("${{ secrets.SIGNING_KEY }}")
+          )
+          Get-Item "$env:RUNNER_TEMP\signing-key.gpg" | Select-Object Length
+
+      - name: Build JNI libraries for all languages
+        run: |
+          tasks=""
+          for lang in languages/*/; do
+            tasks="$tasks :languages:$(basename "$lang"):buildJni"
+          done
+          ./gradlew --no-daemon $tasks
+        shell: bash
+
+      - name: Publish windows JNI artifacts to Maven Central
+        run: >
+          ./gradlew --no-daemon --stacktrace
+          -Psigning.keyId="${{ secrets.SIGNING_KEY_ID }}"
+          -Psigning.secretKeyRingFile="${{ runner.temp }}\signing-key.gpg"
+          -Psigning.password="${{ secrets.SIGNING_PASSWORD }}"
+          :jni:java-windows-x86_64:publishMavenPublicationToMavenCentralRepository
+          :jni:xml-windows-x86_64:publishMavenPublicationToMavenCentralRepository
+        env:
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}

@@ -3,19 +3,18 @@ name: Publish
 "on":
   workflow_dispatch:
 
-# Publishes the language JVM jars and per-platform JNI artifacts to Maven
-# Central. Each publication is produced by exactly one runner:
+# Publishes every language's JVM jar and per-platform JNI artifacts to Maven
+# Central. Each publication is produced by exactly one runner, and each
+# runner publishes only the JNI artifacts of its own platform:
 #
-#   macos-14      -> java/xml -kmp-jvm jars + their -kmp-jni-darwin-* artifacts
-#                    (metadata, jvm and Android publications are only on macOS;
-#                    the -kmp-jvm jar is pure Java so it is identical here and
-#                    on Linux, but Maven Central forbids re-publishing the same
-#                    coordinates, so the jvm jars are published from macOS)
-#   ubuntu-latest -> java/xml -kmp-jvm jars + their -kmp-jni-linux-* artifacts
-#                    (cross-compiled linux-aarch64 via the aarch64-linux-gnu
-#                    toolchain)
-#   windows-latest -> java/xml -kmp-jni-windows-x86_64 artifacts (native
-#                    MinGW/CMake build)
+#   macos-14      -> all languages' -kmp-jvm jars (once) +
+#                    -kmp-jni-darwin-aarch64 (native) and
+#                    -kmp-jni-darwin-x86_64 (cross-compiled with
+#                    -Pjni.os=macos -Pjni.arch=x64)
+#   ubuntu-latest -> -kmp-jni-linux-x86_64 (native) and
+#                    -kmp-jni-linux-aarch64 (cross-compiled with
+#                    -Pjni.os=linux -Pjni.arch=aarch64)
+#   windows-latest -> -kmp-jni-windows-x86_64 (native MinGW/CMake build)
 #
 # The jvm POM of each language lists all five JNI artifacts as runtime
 # dependencies, so all of them must be published before consumers can resolve
@@ -60,7 +59,7 @@ jobs:
         run: |
           echo "${{ secrets.SIGNING_KEY }}" | tr -d ' \n' | base64 -d > "$RUNNER_TEMP/signing-key.gpg"
 
-      - name: Build JNI libraries for all languages
+      - name: Build JNI libraries for all languages (arm64)
         run: |
           tasks=""
           for lang in languages/*/; do
@@ -68,26 +67,52 @@ jobs:
           done
           ./gradlew --no-daemon $tasks
 
-      - name: Publish jvm jars and darwin JNI artifacts to Maven Central
+      - name: Publish jvm jars and darwin-aarch64 JNI artifacts
         env:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
-        run: >
-          ./gradlew --no-daemon --stacktrace
-          -Psigning.keyId="${{ secrets.SIGNING_KEY_ID }}"
-          -Psigning.secretKeyRingFile="${{ runner.temp }}/signing-key.gpg"
-          -Psigning.password="${{ secrets.SIGNING_PASSWORD }}"
-          -PmavenCentralUsername="${{ secrets.MAVEN_CENTRAL_USERNAME }}"
-          -PmavenCentralPassword="${{ secrets.MAVEN_CENTRAL_PASSWORD }}"
-          :languages:java:publishJvmPublicationToMavenCentral
-          :languages:xml:publishJvmPublicationToMavenCentral
-          :jni:java-darwin-aarch64:publishMavenPublicationToMavenCentralRepository
-          :jni:java-darwin-x86_64:publishMavenPublicationToMavenCentralRepository
-          :jni:xml-darwin-aarch64:publishMavenPublicationToMavenCentralRepository
-          :jni:xml-darwin-x86_64:publishMavenPublicationToMavenCentralRepository
+        run: |
+          tasks=""
+          for lang in languages/*/; do
+            lang_name="$(basename "$lang")"
+            tasks="$tasks :languages:$lang_name:publishJvmPublicationToMavenCentralRepository"
+            tasks="$tasks :jni:$lang_name:publishJniDarwinAarch64PublicationToMavenCentralRepository"
+          done
+          ./gradlew --no-daemon --stacktrace \
+            -Psigning.keyId="${{ secrets.SIGNING_KEY_ID }}" \
+            -Psigning.secretKeyRingFile="${{ runner.temp }}/signing-key.gpg" \
+            -Psigning.password="${{ secrets.SIGNING_PASSWORD }}" \
+            $tasks
+        shell: bash
+
+      - name: Build JNI libraries for all languages (x86_64 cross)
+        run: |
+          tasks=""
+          for lang in languages/*/; do
+            tasks="$tasks :languages:$(basename "$lang"):buildJni"
+          done
+          ./gradlew --no-daemon -Pjni.os=macos -Pjni.arch=x64 $tasks
+
+      - name: Publish darwin-x86_64 JNI artifacts
+        env:
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+        run: |
+          tasks=""
+          for lang in languages/*/; do
+            lang_name="$(basename "$lang")"
+            tasks="$tasks :jni:$lang_name:publishJniDarwinX86_64PublicationToMavenCentralRepository"
+          done
+          ./gradlew --no-daemon --stacktrace \
+            -Pjni.os=macos -Pjni.arch=x64 \
+            -Psigning.keyId="${{ secrets.SIGNING_KEY_ID }}" \
+            -Psigning.secretKeyRingFile="${{ runner.temp }}/signing-key.gpg" \
+            -Psigning.password="${{ secrets.SIGNING_PASSWORD }}" \
+            $tasks
+        shell: bash
 
   publish-linux:
-    name: Publish Linux (jvm jars + linux JNI artifacts)
+    name: Publish Linux (linux JNI artifacts)
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -118,7 +143,7 @@ jobs:
         run: |
           echo "${{ secrets.SIGNING_KEY }}" | tr -d ' \n' | base64 -d > "$RUNNER_TEMP/signing-key.gpg"
 
-      - name: Build JNI libraries for all languages
+      - name: Build JNI libraries for all languages (x86_64)
         run: |
           tasks=""
           for lang in languages/*/; do
@@ -126,7 +151,24 @@ jobs:
           done
           ./gradlew --no-daemon $tasks
 
-      - name: Cross-build linux-aarch64 JNI libraries
+      - name: Publish linux-x86_64 JNI artifacts
+        env:
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+        run: |
+          tasks=""
+          for lang in languages/*/; do
+            lang_name="$(basename "$lang")"
+            tasks="$tasks :jni:$lang_name:publishJniLinuxX86_64PublicationToMavenCentralRepository"
+          done
+          ./gradlew --no-daemon --stacktrace \
+            -Psigning.keyId="${{ secrets.SIGNING_KEY_ID }}" \
+            -Psigning.secretKeyRingFile="${{ runner.temp }}/signing-key.gpg" \
+            -Psigning.password="${{ secrets.SIGNING_PASSWORD }}" \
+            $tasks
+        shell: bash
+
+      - name: Build JNI libraries for all languages (aarch64 cross)
         run: |
           tasks=""
           for lang in languages/*/; do
@@ -134,21 +176,23 @@ jobs:
           done
           ./gradlew --no-daemon -Pjni.os=linux -Pjni.arch=aarch64 $tasks
 
-      - name: Publish jvm jars and linux JNI artifacts to Maven Central
-        run: >
-          ./gradlew --no-daemon --stacktrace
-          -Psigning.keyId="${{ secrets.SIGNING_KEY_ID }}"
-          -Psigning.secretKeyRingFile="${{ runner.temp }}/signing-key.gpg"
-          -Psigning.password="${{ secrets.SIGNING_PASSWORD }}"
-          :languages:java:publishJvmPublicationToMavenCentral
-          :languages:xml:publishJvmPublicationToMavenCentral
-          :jni:java-linux-x86_64:publishMavenPublicationToMavenCentralRepository
-          :jni:java-linux-aarch64:publishMavenPublicationToMavenCentralRepository
-          :jni:xml-linux-x86_64:publishMavenPublicationToMavenCentralRepository
-          :jni:xml-linux-aarch64:publishMavenPublicationToMavenCentralRepository
+      - name: Publish linux-aarch64 JNI artifacts
         env:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+        run: |
+          tasks=""
+          for lang in languages/*/; do
+            lang_name="$(basename "$lang")"
+            tasks="$tasks :jni:$lang_name:publishJniLinuxAarch64PublicationToMavenCentralRepository"
+          done
+          ./gradlew --no-daemon --stacktrace \
+            -Pjni.os=linux -Pjni.arch=aarch64 \
+            -Psigning.keyId="${{ secrets.SIGNING_KEY_ID }}" \
+            -Psigning.secretKeyRingFile="${{ runner.temp }}/signing-key.gpg" \
+            -Psigning.password="${{ secrets.SIGNING_PASSWORD }}" \
+            $tasks
+        shell: bash
 
   publish-windows:
     name: Publish Windows (windows JNI artifacts)
@@ -191,14 +235,19 @@ jobs:
           ./gradlew --no-daemon $tasks
         shell: bash
 
-      - name: Publish windows JNI artifacts to Maven Central
-        run: >
-          ./gradlew --no-daemon --stacktrace
-          -Psigning.keyId="${{ secrets.SIGNING_KEY_ID }}"
-          -Psigning.secretKeyRingFile="${{ runner.temp }}\signing-key.gpg"
-          -Psigning.password="${{ secrets.SIGNING_PASSWORD }}"
-          :jni:java-windows-x86_64:publishMavenPublicationToMavenCentralRepository
-          :jni:xml-windows-x86_64:publishMavenPublicationToMavenCentralRepository
+      - name: Publish windows-x86_64 JNI artifacts
+        run: |
+          tasks=""
+          for lang in languages/*/; do
+            lang_name="$(basename "$lang")"
+            tasks="$tasks :jni:$lang_name:publishJniWindowsX86_64PublicationToMavenCentralRepository"
+          done
+          ./gradlew --no-daemon --stacktrace \
+            -Psigning.keyId="${{ secrets.SIGNING_KEY_ID }}" \
+            -Psigning.secretKeyRingFile="${{ runner.temp }}\signing-key.gpg" \
+            -Psigning.password="${{ secrets.SIGNING_PASSWORD }}" \
+            $tasks
+        shell: bash
         env:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}

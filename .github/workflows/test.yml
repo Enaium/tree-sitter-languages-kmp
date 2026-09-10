@@ -96,5 +96,6 @@ jobs:
           case "$(uname -s)" in
             MINGW*|MSYS*) jar="$(cygpath -w "$jar")" ;;
           esac
-          unzip -l "$jar" | grep -E "lib/[a-z0-9_]+-(linux|macos|windows)-ktreesitter-(java|xml)\.(so|dylib|dll)" | head -3
+          jar tf "$jar" | grep -E "lib/" | head -5
+          jar tf "$jar" | grep -E "lib/.*-ktreesitter-(java|xml)\.(so|dylib|dll)" | head -3
         shell: bash

@@ -91,7 +91,7 @@ jobs:
           # The jvm jar ships the native library built for this runner,
           # named <arch>-<os>-<lang>.<ext> (tree-sitter-ng layout).
           find ~/.m2/repository/cn/enaium/treesitter/treesitter-languages-java-kmp-jvm -name '*.jar' | head -1
-          jar="$(find ~/.m2/repository/cn/enaium/treesitter/treesitter-languages-java-kmp-jvm -name '*.jar' | head -1)"
+          jar="$(find ~/.m2/repository/cn/enaium/treesitter/treesitter-languages-java-kmp-jvm -name '*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' | head -1)"
           echo "jar=$jar"
           case "$(uname -s)" in
             MINGW*|MSYS*) jar="$(cygpath -w "$jar")" ;;

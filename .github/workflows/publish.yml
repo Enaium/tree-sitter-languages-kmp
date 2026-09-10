@@ -76,7 +76,7 @@ jobs:
           for lang in languages/*/; do
             lang_name="$(basename "$lang")"
             tasks="$tasks :languages:$lang_name:publishJvmPublicationToMavenCentralRepository"
-            tasks="$tasks :jni:$lang_name:publishJniDarwinAarch64PublicationToMavenCentralRepository"
+            tasks="$tasks :jni:$lang_name-darwin-aarch64:publishMavenPublicationToMavenCentralRepository"
           done
           ./gradlew --no-daemon --stacktrace \
             -Psigning.keyId="${{ secrets.SIGNING_KEY_ID }}" \
@@ -101,7 +101,7 @@ jobs:
           tasks=""
           for lang in languages/*/; do
             lang_name="$(basename "$lang")"
-            tasks="$tasks :jni:$lang_name:publishJniDarwinX86_64PublicationToMavenCentralRepository"
+            tasks="$tasks :jni:$lang_name-darwin-x86_64:publishMavenPublicationToMavenCentralRepository"
           done
           ./gradlew --no-daemon --stacktrace \
             -Pjni.os=macos -Pjni.arch=x64 \
@@ -159,7 +159,7 @@ jobs:
           tasks=""
           for lang in languages/*/; do
             lang_name="$(basename "$lang")"
-            tasks="$tasks :jni:$lang_name:publishJniLinuxX86_64PublicationToMavenCentralRepository"
+            tasks="$tasks :jni:$lang_name-linux-x86_64:publishMavenPublicationToMavenCentralRepository"
           done
           ./gradlew --no-daemon --stacktrace \
             -Psigning.keyId="${{ secrets.SIGNING_KEY_ID }}" \
@@ -184,7 +184,7 @@ jobs:
           tasks=""
           for lang in languages/*/; do
             lang_name="$(basename "$lang")"
-            tasks="$tasks :jni:$lang_name:publishJniLinuxAarch64PublicationToMavenCentralRepository"
+            tasks="$tasks :jni:$lang_name-linux-aarch64:publishMavenPublicationToMavenCentralRepository"
           done
           ./gradlew --no-daemon --stacktrace \
             -Pjni.os=linux -Pjni.arch=aarch64 \
@@ -240,7 +240,7 @@ jobs:
           tasks=""
           for lang in languages/*/; do
             lang_name="$(basename "$lang")"
-            tasks="$tasks :jni:$lang_name:publishJniWindowsX86_64PublicationToMavenCentralRepository"
+            tasks="$tasks :jni:$lang_name-windows-x86_64:publishMavenPublicationToMavenCentralRepository"
           done
           ./gradlew --no-daemon --stacktrace \
             -Psigning.keyId="${{ secrets.SIGNING_KEY_ID }}" \

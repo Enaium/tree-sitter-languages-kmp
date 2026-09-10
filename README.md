@@ -80,27 +80,19 @@ submodule tag at build time (smali is pinned to `1.0.0` because its repo tags re
 Local test: `./gradlew :languages:xml:publishToMavenLocal` then consume
 `cn.enaium.treesitter:treesitter-languages-xml-kmp-jvm:<tag-version>` from `mavenLocal()`.
 
-### JVM JNI runtime artifacts
+### JVM runtime artifacts
 
-The JVM jar is pure Java classes. The native grammar is shipped as a separate per-platform JNI artifact:
+The JVM jar embeds the platform native grammar library built by `buildJni` at
+`lib/<arch>-<os>-<lang>.<ext>` inside the jar (tree-sitter-ng layout), e.g.
+`lib/aarch64-macos-ktreesitter-java.dylib`. At runtime the generated binding's
+`libPath()` picks the entry matching the consumer's OS/arch and unpacks it to a
+temp file before `System.load`. Each CI platform builds and publishes the JVM
+jar for its own platform (`-Pjni.os` / `-Pjni.arch` override the host platform
+for cross-compiled `linux-aarch64` / `darwin-x86_64`).
 
-| Artifact | OS / arch | Contents |
-|---|---|---|
-| `treesitter-languages-jni-darwin-aarch64` | macOS arm64 | `lib/macos/aarch64/*.dylib` |
-| `treesitter-languages-jni-darwin-x86_64` | macOS x64 | `lib/macos/x64/*.dylib` |
-| `treesitter-languages-jni-linux-x86_64` | Linux x64 | `lib/linux/x64/*.so` |
-| `treesitter-languages-jni-linux-aarch64` | Linux arm64 | `lib/linux/aarch64/*.so` |
-| `treesitter-languages-jni-windows-x86_64` | Windows x64 | `lib/windows/x64/*.dll` |
-
-Each language's JVM artifact declares all five JNI artifacts as `runtime` dependencies; consumers get the native
-library matching their OS/arch from the classpath, where the generated binding's `libPath()` unpacks it to a temp
-file. The platform artifacts are built on/for their own platform (the `jni/<os>-<arch>` modules package the
-`buildJni` outputs of every language), and published from CI on each platform.
-
-CI (`.github/workflows/test.yml`) builds each platform's JNI libraries, publishes the language JVM jars plus the
-platform JNI artifact to Maven Local, verifies the artifact contents, and — on natively built platforms — runs a
-smoke project that parses Java and XML from the published artifacts. `linux-aarch64` and `darwin-x86_64` are
-cross-compiled (with `-Pjni.os` / `-Pjni.arch` overriding the host platform).
+CI (`.github/workflows/test.yml`) builds each platform's JNI libraries,
+publishes the language JVM jars to Maven Local, and verifies the native library
+is embedded in each jar.
 
 ## Usage
 

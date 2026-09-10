@@ -84,18 +84,17 @@ jobs:
           ./gradlew --no-daemon $signing_args $cross_args $tasks
           ./gradlew --no-daemon $signing_args \
             :languages:java:publishJvmPublicationToMavenLocal \
-            :languages:xml:publishJvmPublicationToMavenLocal \
-            :jni:${{ matrix.jni-suffix }}:jniJar \
-            :jni:${{ matrix.jni-suffix }}:publishToMavenLocal
+            :languages:xml:publishJvmPublicationToMavenLocal
         shell: bash
-      - name: Verify JNI artifact contents
+      - name: Verify JVM artifact embeds the native library
         run: |
-          find ~/.m2/repository/cn/enaium/treesitter/treesitter-languages-jni-${{ matrix.jni-suffix }}/0.25.1 -type f | head -5
-          jar="$(find ~/.m2/repository/cn/enaium/treesitter/treesitter-languages-jni-${{ matrix.jni-suffix }}/0.25.1 -name '*.jar' | head -1)"
+          # The jvm jar ships the native library built for this runner,
+          # named <arch>-<os>-<lang>.<ext> (tree-sitter-ng layout).
+          find ~/.m2/repository/cn/enaium/treesitter/treesitter-languages-java-kmp-jvm -name '*.jar' | head -1
+          jar="$(find ~/.m2/repository/cn/enaium/treesitter/treesitter-languages-java-kmp-jvm -name '*.jar' | head -1)"
           echo "jar=$jar"
           case "$(uname -s)" in
             MINGW*|MSYS*) jar="$(cygpath -w "$jar")" ;;
           esac
-          jar tf "$jar" | grep -E "lib/.*/libktreesitter-java" | head -3
-          jar tf "$jar" | wc -l
+          unzip -l "$jar" | grep -E "lib/[a-z0-9_]+-(linux|macos|windows)-ktreesitter-(java|xml)\.(so|dylib|dll)" | head -3
         shell: bash

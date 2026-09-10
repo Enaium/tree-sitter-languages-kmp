@@ -4,6 +4,7 @@ import java.io.File
 import java.time.Duration
 import java.io.OutputStream.nullOutputStream
 import org.gradle.internal.os.OperatingSystem
+import org.gradle.api.file.RelativePath
 import org.gradle.kotlin.dsl.support.useToRun
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
@@ -238,21 +239,10 @@ fun KotlinNativeTarget.treesitter() {
 
 kotlin {
     jvm() {
-        // The JVM artifact is pure Java; the per-platform JNI artifacts are
-        // runtime dependencies so consumers get the native library for their
-        // OS/arch (published from CI on each platform).
-        val jniArtifacts = listOf(
-            "treesitter-languages-jni-darwin-aarch64",
-            "treesitter-languages-jni-darwin-x86_64",
-            "treesitter-languages-jni-linux-x86_64",
-            "treesitter-languages-jni-linux-aarch64",
-            "treesitter-languages-jni-windows-x86_64"
-        )
-        sourceSets["jvmMain"].dependencies {
-            jniArtifacts.forEach { artifact ->
-                runtimeOnly("cn.enaium.treesitter:$artifact:0.25.1")
-            }
-        }
+        // The JVM artifact embeds the native library for the platform it was
+        // built on (see jvmProcessResources below), so consumers get the
+        // native binary from the jar itself.
+        sourceSets["jvmMain"]
     }
 
     androidLibrary {
@@ -333,10 +323,23 @@ tasks.matching { it.name == "androidSourcesJar" || it.name.endsWith("SourcesJar"
 }
 
 
-// The JVM artifact is pure Java; JNI libraries ship in separate
-// -kmp-jni-<os>-<arch> artifacts (published per-platform from CI).
-tasks.named("jvmProcessResources") {
-    dependsOn(generateTask)
+// The JVM artifact embeds the native library built by buildJni (for the
+// host platform, or the -Pjni.os/-Pjni.arch cross target on CI) at
+// /lib/<arch>-<os>-<name>.<ext> inside the jar, matching the loader in
+// jvm.kt.in (tree-sitter-ng layout).
+tasks.named<ProcessResources>("jvmProcessResources") {
+    dependsOn(generateTask, buildJni)
+    from(jniLibsDir) {
+        include("lib/$jniOs/$jniArch/*")
+        eachFile {
+            val ext = name.substringAfterLast('.')
+            val bare = name.removePrefix("lib").removeSuffix(".$ext")
+            name = "$jniArch-$jniOs-$bare.$ext"
+            path = "lib/$name"
+            relativePath = RelativePath(true, *"lib/$name".split('/').toTypedArray())
+        }
+        includeEmptyDirs = false
+    }
 }
 
 // ===== Native grammar compilation =====

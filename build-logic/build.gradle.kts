@@ -20,9 +20,5 @@ gradlePlugin {
             id = "tree-sitter-grammar"
             implementationClass = "cn.enaium.treesitter.languages.plugin.GrammarPlugin"
         }
-        create("tree-sitter-jni-platform") {
-            id = "tree-sitter-jni-platform"
-            implementationClass = "cn.enaium.treesitter.languages.plugin.JniPlatformPlugin"
-        }
     }
 }

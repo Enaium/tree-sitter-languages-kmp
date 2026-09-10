@@ -90,7 +90,9 @@ jobs:
         shell: bash
       - name: Verify JNI artifact contents
         run: |
+          find ~/.m2/repository/cn/enaium/treesitter/treesitter-languages-jni-${{ matrix.jni-suffix }}/0.25.1 -type f | head -5
           jar="$(find ~/.m2/repository/cn/enaium/treesitter/treesitter-languages-jni-${{ matrix.jni-suffix }}/0.25.1 -name '*.jar' | head -1)"
+          echo "jar=$jar"
           jar tf "$jar" | grep -E "lib/.*/libktreesitter-java" | head -3
           jar tf "$jar" | wc -l
         shell: bash

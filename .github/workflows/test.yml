@@ -82,7 +82,7 @@ jobs:
             tasks="$tasks :languages:$(basename "$lang"):buildJni"
           done
           ./gradlew --no-daemon $signing_args $cross_args $tasks
-          ./gradlew --no-daemon $signing_args \
+          ./gradlew --no-daemon $signing_args $cross_args \
             :languages:java:publishJvmPublicationToMavenLocal \
             :languages:xml:publishJvmPublicationToMavenLocal
         shell: bash

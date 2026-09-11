@@ -98,7 +98,7 @@ jobs:
           for lang in languages/*/; do
             lang_name="$(basename "$lang")"
             jar="$(find ~/.m2/repository/cn/enaium/treesitter/treesitter-languages-$lang_name-kmp-jni-${{ matrix.jni-suffix }} -name '*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' | head -1)"
-            entries="$(unzip -l "$jar" 2>/dev/null | grep -E "lib/.*/libktreesitter-$lang_name\.(so|dylib|dll)" | wc -l)"
+            entries="$(unzip -l "$jar" 2>/dev/null | grep -E "lib/.*/lib?ktreesitter-$lang_name\.(so|dylib|dll)" | wc -l)"
             echo "$lang_name: $entries native entry/ies in $(basename "$jar")"
             if [ "$entries" -eq 0 ]; then failed=1; fi
           done

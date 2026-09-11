@@ -80,6 +80,15 @@ tasks.named<Copy>("processResources") {
     from(langJniLibs) {
         include("lib/$jniOs/$jniArch/*")
     }
+    doLast {
+        // Never ship an empty jar: the native library must be present.
+        val copied = destinationDir.listFiles()
+            ?.flatMap { it.walkTopDown().filter { f -> f.isFile }.toList() }
+            .orEmpty()
+        check(copied.any { it.name.contains("ktreesitter-$langName") }) {
+            "No native library for $langName on $jniOs/$jniArch found; refusing to package an empty jar"
+        }
+    }
 }
 
 mavenPublishing {

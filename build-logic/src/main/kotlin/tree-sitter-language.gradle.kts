@@ -499,6 +499,16 @@ val buildJni = tasks.register("buildJni") {
         )
         runProcess(listOf("cmake", "--build", buildDir.path, "--config", "RelWithDebInfo"))
         runProcess(listOf("cmake", "--install", buildDir.path, "--config", "RelWithDebInfo"))
+        // Guard against publishing empty jars: the native library must have
+        // been installed for the target platform.
+        val installed = File(installPrefix, installLibDir).listFiles()
+            ?.filter { it.isFile }
+            ?.any { it.name.startsWith("lib$jniLibName.") || it.name.startsWith("$jniLibName.") }
+            ?: false
+        check(installed) {
+            "buildJni produced no native library for $jniOs/$jniArch " +
+                "(expected in ${File(installPrefix, installLibDir).path})"
+        }
     }
 }
 

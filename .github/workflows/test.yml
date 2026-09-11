@@ -91,18 +91,19 @@ jobs:
           ./gradlew --no-daemon $signing_args $cross_args $publish_tasks
         shell: bash
       - name: Verify JNI artifact embeds the native library
-        if: runner.os != 'Windows'
         run: |
-          # The jni jar ships the native library built for this runner
-          # at lib/<os>/<arch>/libktreesitter-<lang>.<ext>.
-          for lang in java xml; do
-            jar="$(find ~/.m2/repository/cn/enaium/treesitter/treesitter-languages-$lang-kmp-jni-${{ matrix.jni-suffix }} -name '*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' | head -1)"
-            echo "jar=$jar"
-            jar tf "$jar" | grep -E "lib/.*/libktreesitter-$lang" | head -2
+          # Every language's jni jar for this runner must contain its native
+          # library at lib/<os>/<arch>/libktreesitter-<lang>.<ext>.
+          failed=0
+          for lang in languages/*/; do
+            lang_name="$(basename "$lang")"
+            jar="$(find ~/.m2/repository/cn/enaium/treesitter/treesitter-languages-$lang_name-kmp-jni-${{ matrix.jni-suffix }} -name '*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' | head -1)"
+            entries="$(unzip -l "$jar" 2>/dev/null | grep -E "lib/.*/libktreesitter-$lang_name\.(so|dylib|dll)" | wc -l)"
+            echo "$lang_name: $entries native entry/ies in $(basename "$jar")"
+            if [ "$entries" -eq 0 ]; then failed=1; fi
           done
-        shell: bash
-      - name: Verify JNI artifact exists
-        if: runner.os == 'Windows'
-        run: |
-          test -n "$(find ~/.m2/repository/cn/enaium/treesitter/treesitter-languages-java-kmp-jni-${{ matrix.jni-suffix }} -name '*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' | head -1)"
+          if [ "$failed" -ne 0 ]; then
+            echo "ERROR: at least one JNI jar is missing its native library"
+            exit 1
+          fi
         shell: bash

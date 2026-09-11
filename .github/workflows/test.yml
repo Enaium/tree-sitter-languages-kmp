@@ -93,9 +93,18 @@ jobs:
       - name: Verify JNI artifact embeds the native library
         run: |
           echo "=== jni-libs diagnostics ==="
-          ls -la languages/agda/build/jni-libs/lib/ 2>&1 | head -10
-          ls -la languages/agda/build/jni-libs/lib/windows/ 2>&1 | head -10
           ls -la languages/agda/build/jni-libs/lib/windows/x64/ 2>&1 | head -10
+          echo "=== resources/main ==="
+          find build/jni-modules/agda-windows-x86_64/build/resources -type f 2>&1 | head -10
+          echo "=== jar listing ==="
+          python3 -c "
+          import glob, zipfile
+          jars = [f for f in glob.glob('build/jni-modules/agda-windows-x86_64/build/libs/*.jar') if 'sources' not in f and 'javadoc' not in f]
+          if jars:
+              print('\n'.join(zipfile.ZipFile(jars[0]).namelist()))
+          else:
+              print('no jar found')
+          "
           python3 - "${{ matrix.jni-suffix }}" <<'EOF'
           import glob, os, re, sys, zipfile
           suffix = sys.argv[1]

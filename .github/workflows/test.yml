@@ -105,6 +105,16 @@ jobs:
           else:
               print('no jar found')
           "
+          echo "=== m2 agda jar ==="
+          python3 - <<'EOF'
+          import glob, os, zipfile
+          home = os.path.expanduser("~")
+          d = os.path.join(home, ".m2", "repository", "cn", "enaium", "treesitter", "treesitter-languages-agda-kmp-jni-windows-x86_64")
+          print("m2 dir:", d)
+          for j in glob.glob(os.path.join(d, "*", "*.jar")):
+              print("jar:", j, os.path.getsize(j))
+              print("entries:", zipfile.ZipFile(j).namelist())
+          EOF
           python3 - "${{ matrix.jni-suffix }}" <<'EOF'
           import glob, os, re, sys, zipfile
           suffix = sys.argv[1]

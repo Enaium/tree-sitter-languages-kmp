@@ -90,6 +90,7 @@ jobs:
         shell: bash
 
       - name: Build JNI libraries for all languages (x86_64 cross)
+        if: always()
         run: |
           tasks=""
           for lang in languages/*/; do
@@ -98,6 +99,7 @@ jobs:
           ./gradlew --no-daemon -Pjni.os=macos -Pjni.arch=x64 $tasks
 
       - name: Publish darwin-x86_64 JNI artifacts
+        if: always()
         env:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
@@ -173,6 +175,7 @@ jobs:
         shell: bash
 
       - name: Build JNI libraries for all languages (aarch64 cross)
+        if: always()
         run: |
           tasks=""
           for lang in languages/*/; do
@@ -181,6 +184,7 @@ jobs:
           ./gradlew --no-daemon -Pjni.os=linux -Pjni.arch=aarch64 $tasks
 
       - name: Publish linux-aarch64 JNI artifacts
+        if: always()
         env:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}

@@ -92,6 +92,10 @@ jobs:
         shell: bash
       - name: Verify JNI artifact embeds the native library
         run: |
+          echo "=== jni-libs diagnostics ==="
+          ls -la languages/agda/build/jni-libs/lib/ 2>&1 | head -10
+          ls -la languages/agda/build/jni-libs/lib/windows/ 2>&1 | head -10
+          ls -la languages/agda/build/jni-libs/lib/windows/x64/ 2>&1 | head -10
           python3 - "${{ matrix.jni-suffix }}" <<'EOF'
           import glob, os, re, sys, zipfile
           suffix = sys.argv[1]

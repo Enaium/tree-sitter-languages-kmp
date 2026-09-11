@@ -3,15 +3,14 @@
 import org.gradle.api.tasks.Copy
 
 /**
- * Convention for the per-language per-platform JNI artifacts
- * (`jni/<lang>-<platform>` modules, sdl-kmp layout).
+ * Convention for the dynamically generated per-language per-platform JNI
+ * projects (`build/jni-modules/<lang>-<platform>`, registered in settings).
  *
- * Each module is a plain java-library published with
- * com.vanniktech.maven.publish (the only sanctioned publisher): vannaniktech
- * creates the `maven` publication from `components.java`, the native library
- * that `:languages:<lang>:buildJni` built for this module's platform rides in
- * `src/main/resources/lib/<os>/<arch>/` via processResources and lands in the
- * jar as `lib/<os>/<arch>/libktreesitter-<lang>.<ext>`.
+ * Each is a plain java-library whose `maven` publication is created by
+ * com.vanniktech.maven.publish from `components.java`; the native library
+ * that `:languages:<lang>:buildJni` built for this project's platform rides
+ * in `src/main/resources/lib/<os>/<arch>/` via processResources and lands in
+ * the jar as `lib/<os>/<arch>/libktreesitter-<lang>.<ext>`.
  *
  * Coordinates: cn.enaium.treesitter:treesitter-languages-<lang>-kmp-jni-<platform>
  * Version: grammar repository tag + .1 release suffix.

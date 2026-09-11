@@ -461,6 +461,11 @@ val buildJni = tasks.register("buildJni") {
     group = "build"
     description = "Build the JNI library for platform $jniOs/$jniArch"
     dependsOn(generateTask)
+    // -Pjni.os/-Pjni.arch change the output platform; without declaring them
+    // as inputs a cross build after a native one would be skipped as
+    // UP-TO-DATE and publish an empty jar.
+    inputs.property("jniOs", jniOs)
+    inputs.property("jniArch", jniArch)
     outputs.dir(jniLibsDir)
     doLast {
         val generatedDir = layout.buildDirectory.dir("generatedGrammar").get().asFile

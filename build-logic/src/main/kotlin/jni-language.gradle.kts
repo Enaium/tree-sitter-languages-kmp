@@ -66,10 +66,10 @@ if (grammarTag == null) {
     }
 }
 val publishVersion: String = if (langName == "smali") {
-    "1.0.0.1"
+    "1.0.0.2"
 } else {
     check(grammarTag != null) { "Cannot determine version for grammar $langName (git describe failed)" }
-    "$grammarTag.1"
+    "$grammarTag.2"
 }
 version = publishVersion
 

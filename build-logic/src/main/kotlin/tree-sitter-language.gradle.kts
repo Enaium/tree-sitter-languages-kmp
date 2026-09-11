@@ -83,8 +83,8 @@ val grammarVersion: String = if (grammarName == "smali") {
     resolveGrammarVersion()
 }
 // Release suffix: the grammar tag version was already published, so append
-// .1 (x.x.x.1) for this project's publications.
-val publishVersion: String = "$grammarVersion.1"
+// .2 (x.x.x.2) for this project's publications.
+val publishVersion: String = "$grammarVersion.2"
 version = publishVersion
 val jniLibName: String = "ktreesitter-$grammarName"
 

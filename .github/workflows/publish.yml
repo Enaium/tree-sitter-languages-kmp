@@ -82,7 +82,7 @@ jobs:
             tasks="$tasks :languages:$lang_name:publishJvmPublicationToMavenCentralRepository"
             tasks="$tasks :jni:$lang_name-darwin-aarch64:publishMavenPublicationToMavenCentralRepository"
           done
-          ./gradlew --no-daemon --stacktrace \
+          ./gradlew --no-daemon --stacktrace --continue \
             -Psigning.keyId="${{ secrets.SIGNING_KEY_ID }}" \
             -Psigning.secretKeyRingFile="${{ runner.temp }}/signing-key.gpg" \
             -Psigning.password="${{ secrets.SIGNING_PASSWORD }}" \
@@ -107,7 +107,7 @@ jobs:
             lang_name="$(basename "$lang")"
             tasks="$tasks :jni:$lang_name-darwin-x86_64:publishMavenPublicationToMavenCentralRepository"
           done
-          ./gradlew --no-daemon --stacktrace \
+          ./gradlew --no-daemon --stacktrace --continue \
             -Pjni.os=macos -Pjni.arch=x64 \
             -Psigning.keyId="${{ secrets.SIGNING_KEY_ID }}" \
             -Psigning.secretKeyRingFile="${{ runner.temp }}/signing-key.gpg" \
@@ -165,7 +165,7 @@ jobs:
             lang_name="$(basename "$lang")"
             tasks="$tasks :jni:$lang_name-linux-x86_64:publishMavenPublicationToMavenCentralRepository"
           done
-          ./gradlew --no-daemon --stacktrace \
+          ./gradlew --no-daemon --stacktrace --continue \
             -Psigning.keyId="${{ secrets.SIGNING_KEY_ID }}" \
             -Psigning.secretKeyRingFile="${{ runner.temp }}/signing-key.gpg" \
             -Psigning.password="${{ secrets.SIGNING_PASSWORD }}" \
@@ -190,7 +190,7 @@ jobs:
             lang_name="$(basename "$lang")"
             tasks="$tasks :jni:$lang_name-linux-aarch64:publishMavenPublicationToMavenCentralRepository"
           done
-          ./gradlew --no-daemon --stacktrace \
+          ./gradlew --no-daemon --stacktrace --continue \
             -Pjni.os=linux -Pjni.arch=aarch64 \
             -Psigning.keyId="${{ secrets.SIGNING_KEY_ID }}" \
             -Psigning.secretKeyRingFile="${{ runner.temp }}/signing-key.gpg" \
@@ -246,7 +246,7 @@ jobs:
             lang_name="$(basename "$lang")"
             tasks="$tasks :jni:$lang_name-windows-x86_64:publishMavenPublicationToMavenCentralRepository"
           done
-          ./gradlew --no-daemon --stacktrace \
+          ./gradlew --no-daemon --stacktrace --continue \
             -Psigning.keyId="${{ secrets.SIGNING_KEY_ID }}" \
             -Psigning.secretKeyRingFile="${{ runner.temp }}\signing-key.gpg" \
             -Psigning.password="${{ secrets.SIGNING_PASSWORD }}" \

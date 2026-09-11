@@ -92,18 +92,25 @@ jobs:
         shell: bash
       - name: Verify JNI artifact embeds the native library
         run: |
-          # Every language's jni jar for this runner must contain its native
-          # library at lib/<os>/<arch>/libktreesitter-<lang>.<ext>.
-          failed=0
-          for lang in languages/*/; do
-            lang_name="$(basename "$lang")"
-            jar="$(find ~/.m2/repository/cn/enaium/treesitter/treesitter-languages-$lang_name-kmp-jni-${{ matrix.jni-suffix }} -name '*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' | head -1)"
-            entries="$(unzip -l "$jar" 2>/dev/null | grep -E "lib/.*/lib?ktreesitter-$lang_name\.(so|dylib|dll)" | wc -l)"
-            echo "$lang_name: $entries native entry/ies in $(basename "$jar")"
-            if [ "$entries" -eq 0 ]; then failed=1; fi
-          done
-          if [ "$failed" -ne 0 ]; then
-            echo "ERROR: at least one JNI jar is missing its native library"
-            exit 1
-          fi
+          python3 - "${{ matrix.jni-suffix }}" <<'EOF'
+          import glob, os, re, sys, zipfile
+          suffix = sys.argv[1]
+          home = os.path.expanduser("~")
+          repo = os.path.join(home, ".m2", "repository", "cn", "enaium", "treesitter")
+          failed = False
+          for lang in sorted(os.listdir(os.path.join(os.getcwd(), "languages"))):
+              d = os.path.join(repo, f"treesitter-languages-{lang}-kmp-jni-{suffix}")
+              jars = [f for f in glob.glob(os.path.join(d, "*", "*.jar"))
+                      if not f.endswith("-sources.jar") and not f.endswith("-javadoc.jar")]
+              if not jars:
+                  print(f"{lang}: NO JAR"); failed = True; continue
+              pat = re.compile(rf"lib/.*/lib?ktreesitter-{re.escape(lang)}\.(so|dylib|dll)")
+              found = [n for n in zipfile.ZipFile(jars[0]).namelist() if pat.search(n)]
+              print(f"{lang}: {len(found)} native entry/ies in {os.path.basename(jars[0])}")
+              if not found:
+                  failed = True
+          if failed:
+              print("ERROR: at least one JNI jar is missing its native library")
+              sys.exit(1)
+          EOF
         shell: bash

@@ -4,6 +4,7 @@ import java.io.File
 import java.time.Duration
 import java.io.OutputStream.nullOutputStream
 import org.gradle.internal.os.OperatingSystem
+import org.gradle.api.publish.maven.tasks.GenerateMavenPom
 import org.gradle.kotlin.dsl.support.useToRun
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
@@ -239,19 +240,51 @@ fun KotlinNativeTarget.treesitter() {
     }
 }
 
+// Per-platform JNI artifacts for this language (sdl-kmp layout).
+val jniPlatformDeps = listOf(
+    "darwin-aarch64", "darwin-x86_64",
+    "linux-x86_64", "linux-aarch64", "windows-x86_64"
+)
+
 kotlin {
     jvm() {
         // The JVM artifact is pure Java; the native library comes from the
-        // per-platform JNI artifacts published alongside it (see the
-        // publishing block below) — one artifact per language per platform,
-        // like sdl-kmp's jni-jvm-* modules.
-        val jniPlatformDeps = listOf(
-            "darwin-aarch64", "darwin-x86_64",
-            "linux-x86_64", "linux-aarch64", "windows-x86_64"
-        )
+        // per-platform JNI artifacts published alongside it — one artifact per
+        // language per platform (sdl-kmp layout). Within this build the
+        // generated :jni:<lang>-<platform> projects are depended on directly
+        // so consumers (e.g. :example) resolve everything as project deps;
+        // the published POM still carries the five coordinates as runtime
+        // dependencies for external consumers.
         sourceSets["jvmMain"].dependencies {
             jniPlatformDeps.forEach { suffix ->
-                runtimeOnly("cn.enaium.treesitter:treesitter-languages-$grammarName-kmp-jni-$suffix:$publishVersion")
+                runtimeOnly(project(":jni:$grammarName-$suffix"))
+            }
+        }
+    }
+
+    // The published jvm POM must reference the five JNI artifacts by
+    // coordinate (project deps are not rendered into the POM); inject them
+    // as runtime dependencies alongside whatever the build already produced.
+    val jniDepsForPom = jniPlatformDeps.map { suffix ->
+        "cn.enaium.treesitter:treesitter-languages-$grammarName-kmp-jni-$suffix:$publishVersion"
+    }
+    tasks.withType<GenerateMavenPom>().configureEach {
+        onlyIf { name.contains("JvmPublication") }
+        doLast {
+            val pom: java.io.File = destinationFile.get().asFile
+            if (pom.exists()) {
+                var text = pom.readText()
+                if (!text.contains("treesitter-languages-$grammarName-kmp-jni-")) {
+                    val deps = jniDepsForPom.joinToString("") {
+                        val (g, a, v) = it.split(":")
+                        """    <dependency><groupId>$g</groupId><artifactId>$a</artifactId><version>$v</version><scope>runtime</scope></dependency>"""
+                    }
+                    text = text.replace(
+                        "</dependencies>",
+                        "$deps\n  </dependencies>"
+                    )
+                    pom.writeText(text)
+                }
             }
         }
     }

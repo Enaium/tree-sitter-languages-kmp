@@ -13,6 +13,9 @@ plugins {
 
 dependencyResolutionManagement {
     repositories {
+        // Local builds consume the JNI artifacts published by
+        // `./gradlew publishToMavenLocal`.
+        mavenLocal()
         google()
         mavenCentral()
     }

@@ -269,8 +269,11 @@ kotlin {
         "cn.enaium.treesitter:treesitter-languages-$grammarName-kmp-jni-$suffix:$publishVersion"
     }
     tasks.withType<GenerateMavenPom>().configureEach {
-        onlyIf { name.contains("JvmPublication") }
         doLast {
+            // Only the jvm POM carries the JNI runtime dependencies; every
+            // other publication (metadata, native klibs, android) must still
+            // generate its POM normally.
+            if (!name.contains("JvmPublication")) return@doLast
             val pom: java.io.File = destinationFile.get().asFile
             if (pom.exists()) {
                 var text = pom.readText()

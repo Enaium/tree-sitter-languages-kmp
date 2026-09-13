@@ -3,18 +3,19 @@ name: Publish
 "on":
   workflow_dispatch:
 
-# Publishes every language's JVM jar and per-platform JNI artifacts to Maven
-# Central. Each publication is produced by exactly one runner, and each
-# runner publishes only the JNI artifacts of its own platform; the
-# cross-compiled platforms are separate jobs so a failure in one never
-# blocks the others and every build finishes successfully (the automatic
-# release only runs on successful builds):
+# Publishes every language's JVM jar, KMP native klibs, android AAR and
+# per-platform JNI artifacts to Maven Central. Each publication is produced
+# by exactly one runner; the cross-compiled platforms are separate jobs so a
+# failure in one never blocks the others and every build finishes
+# successfully (the automatic release only runs on successful builds):
 #
-#   publish-macos       -> all languages' -kmp-jvm jars (once) +
-#                          -kmp-jni-darwin-aarch64 (native)
+#   publish-macos       -> -kmp-jvm, -kmp metadata (kotlinMultiplatform),
+#                          Apple native klibs (macosArm64/macosX64/iosArm64/
+#                          iosSimulatorArm64) and -kmp-jni-darwin-aarch64
 #   publish-darwin-x64  -> -kmp-jni-darwin-x86_64 (cross-compiled with
 #                          -Pjni.os=macos -Pjni.arch=x64)
-#   publish-linux       -> -kmp-jni-linux-x86_64 (native)
+#   publish-linux       -> linuxX64/linuxArm64/mingwX64 native klibs, the
+#                          android AAR and -kmp-jni-linux-x86_64
 #   publish-linux-arm64 -> -kmp-jni-linux-aarch64 (cross-compiled with
 #                          -Pjni.os=linux -Pjni.arch=aarch64)
 #   publish-windows     -> -kmp-jni-windows-x86_64 (native MinGW/CMake build)
@@ -74,7 +75,13 @@ jobs:
           done
           ./gradlew --no-daemon $tasks
 
-      - name: Publish jvm jars and darwin-aarch64 JNI artifacts
+      # Already-published coordinates (e.g. re-running a partially published
+      # version) make these steps fail with 'component already exists';
+      # continue-on-error keeps the remaining publications reachable. A
+      # Gradle build that fails does not trigger the automatic Central
+      # release, so the required artifacts are published in their own steps.
+      - name: Publish jvm jars (tolerate already-published)
+        continue-on-error: true
         env:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
@@ -83,6 +90,44 @@ jobs:
           for lang in languages/*/; do
             lang_name="$(basename "$lang")"
             tasks="$tasks :languages:$lang_name:publishJvmPublicationToMavenCentralRepository"
+          done
+          ./gradlew --no-daemon --stacktrace \
+            -Psigning.keyId="${{ secrets.SIGNING_KEY_ID }}" \
+            -Psigning.secretKeyRingFile="${{ runner.temp }}/signing-key.gpg" \
+            -Psigning.password="${{ secrets.SIGNING_PASSWORD }}" \
+            $tasks
+        shell: bash
+
+      - name: Publish KMP metadata and Apple native klibs
+        env:
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+        run: |
+          tasks=""
+          for lang in languages/*/; do
+            lang_name="$(basename "$lang")"
+            tasks="$tasks :languages:$lang_name:publishKotlinMultiplatformPublicationToMavenCentralRepository"
+            tasks="$tasks :languages:$lang_name:publishMacosArm64PublicationToMavenCentralRepository"
+            tasks="$tasks :languages:$lang_name:publishMacosX64PublicationToMavenCentralRepository"
+            tasks="$tasks :languages:$lang_name:publishIosArm64PublicationToMavenCentralRepository"
+            tasks="$tasks :languages:$lang_name:publishIosSimulatorArm64PublicationToMavenCentralRepository"
+          done
+          ./gradlew --no-daemon --stacktrace \
+            -Psigning.keyId="${{ secrets.SIGNING_KEY_ID }}" \
+            -Psigning.secretKeyRingFile="${{ runner.temp }}/signing-key.gpg" \
+            -Psigning.password="${{ secrets.SIGNING_PASSWORD }}" \
+            $tasks
+        shell: bash
+
+      - name: Publish darwin-aarch64 JNI artifacts (tolerate already-published)
+        continue-on-error: true
+        env:
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+        run: |
+          tasks=""
+          for lang in languages/*/; do
+            lang_name="$(basename "$lang")"
             tasks="$tasks :jni:$lang_name-darwin-aarch64:publishMavenPublicationToMavenCentralRepository"
           done
           ./gradlew --no-daemon --stacktrace \
@@ -127,7 +172,8 @@ jobs:
           done
           ./gradlew --no-daemon -Pjni.os=macos -Pjni.arch=x64 $tasks
 
-      - name: Publish darwin-x86_64 JNI artifacts
+      - name: Publish darwin-x86_64 JNI artifacts (tolerate already-published)
+        continue-on-error: true
         env:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
@@ -177,6 +223,10 @@ jobs:
         run: |
           echo "${{ secrets.SIGNING_KEY }}" | tr -d ' \n' | base64 -d > "$RUNNER_TEMP/signing-key.gpg"
 
+      - name: Install Android NDK
+        run: |
+          yes | ${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager --install "ndk;27.0.12077973" "platforms;android-36" >/dev/null
+
       - name: Build JNI libraries for all languages (x86_64)
         run: |
           tasks=""
@@ -185,7 +235,28 @@ jobs:
           done
           ./gradlew --no-daemon $tasks
 
-      - name: Publish linux-x86_64 JNI artifacts
+      - name: Publish native klibs (linux/mingw) and the android AAR
+        env:
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+        run: |
+          tasks=""
+          for lang in languages/*/; do
+            lang_name="$(basename "$lang")"
+            tasks="$tasks :languages:$lang_name:publishLinuxX64PublicationToMavenCentralRepository"
+            tasks="$tasks :languages:$lang_name:publishLinuxArm64PublicationToMavenCentralRepository"
+            tasks="$tasks :languages:$lang_name:publishMingwX64PublicationToMavenCentralRepository"
+            tasks="$tasks :languages:$lang_name:publishAndroidPublicationToMavenCentralRepository"
+          done
+          ./gradlew --no-daemon --stacktrace \
+            -Psigning.keyId="${{ secrets.SIGNING_KEY_ID }}" \
+            -Psigning.secretKeyRingFile="${{ runner.temp }}/signing-key.gpg" \
+            -Psigning.password="${{ secrets.SIGNING_PASSWORD }}" \
+            $tasks
+        shell: bash
+
+      - name: Publish linux-x86_64 JNI artifacts (tolerate already-published)
+        continue-on-error: true
         env:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
@@ -242,7 +313,8 @@ jobs:
           done
           ./gradlew --no-daemon -Pjni.os=linux -Pjni.arch=aarch64 $tasks
 
-      - name: Publish linux-aarch64 JNI artifacts
+      - name: Publish linux-aarch64 JNI artifacts (tolerate already-published)
+        continue-on-error: true
         env:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
@@ -301,7 +373,8 @@ jobs:
           ./gradlew --no-daemon $tasks
         shell: bash
 
-      - name: Publish windows-x86_64 JNI artifacts
+      - name: Publish windows-x86_64 JNI artifacts (tolerate already-published)
+        continue-on-error: true
         run: |
           tasks=""
           for lang in languages/*/; do

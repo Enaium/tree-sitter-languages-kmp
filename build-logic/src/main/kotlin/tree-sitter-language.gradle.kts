@@ -379,26 +379,21 @@ tasks.named("jvmProcessResources") {
 // ===== Native grammar compilation =====
 @Suppress("DEPRECATION")
 tasks.withType<CInteropProcess>().configureEach {
-    if (name.startsWith("cinteropTest")) return@configureEach
-
     val grammarName = project.name
-    // Locate the Kotlin/Native prebuilt distribution (konanHome is deprecated).
-    // On CI (JVM-only builds) there is no konan distribution; disable the
-    // task instead of failing configuration.
-    val konanRoot = File(System.getProperty("user.home"), ".konan")
-    val konanDist = konanRoot.listFiles { f ->
-        f.isDirectory && f.name.startsWith("kotlin-native-prebuilt")
-    }?.maxByOrNull { it.lastModified() }
-    if (konanDist == null) {
-        enabled = false
-        return@configureEach
-    }
-    val runKonan = konanDist.resolve("bin")
-        .resolve(if (os.isWindows) "run_konan.bat" else "run_konan").path
     val libFile = File(libsDir, konanTarget.name).resolve("libtree-sitter-$grammarName.a")
     val outRoot = layout.buildDirectory.dir("grammar/${konanTarget.name}").get().asFile
 
     doFirst {
+        // Resolve the Kotlin/Native distribution at execution time: on CI the
+        // toolchain is downloaded by the Kotlin plugin during the build, so it
+        // is not yet present when this task is configured.
+        val konanRoot = File(System.getProperty("user.home"), ".konan")
+        val konanDist = konanRoot.listFiles { f ->
+            f.isDirectory && f.name.startsWith("kotlin-native-prebuilt")
+        }?.maxByOrNull { it.lastModified() }
+            ?: error("Kotlin/Native prebuilt distribution not found under $konanRoot")
+        val runKonan = konanDist.resolve("bin")
+            .resolve(if (os.isWindows) "run_konan.bat" else "run_konan").path
         val objectFiles = grammarFiles.mapIndexed { index, src ->
             val workDir = File(outRoot, index.toString()).apply { mkdirs() }
             val argsFile = File.createTempFile("args", null)
